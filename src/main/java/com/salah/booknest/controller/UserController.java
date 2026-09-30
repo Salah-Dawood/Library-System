@@ -2,13 +2,12 @@ package com.salah.booknest.controller;
 
 import com.salah.booknest.model.User;
 import com.salah.booknest.model.request.LoginRequest;
+import com.salah.booknest.model.request.RegisterRequest;
 import com.salah.booknest.service.UserService;
 import lombok.AllArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @AllArgsConstructor
@@ -17,9 +16,11 @@ public class UserController {
     private UserService userService;
 
     @PostMapping("/register")
-    public User createUser(@RequestBody User userObject){
-        System.out.println("calling createUser()");
-        return userService.createUser(userObject);
+    public ResponseEntity<User> register(@RequestBody RegisterRequest request) {
+
+        User createdUser = userService.createUser(request);
+
+        return new ResponseEntity<>(createdUser, HttpStatus.CREATED);
     }
 
     @PostMapping("/login")
@@ -27,7 +28,6 @@ public class UserController {
         System.out.println("calling loginUser()");
         return userService.loginUser(loginRequest);
     }
-
 
 
 }

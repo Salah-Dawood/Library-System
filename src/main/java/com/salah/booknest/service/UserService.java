@@ -3,6 +3,7 @@ package com.salah.booknest.service;
 import com.salah.booknest.exception.InformationExistException;
 import com.salah.booknest.model.User;
 import com.salah.booknest.model.request.LoginRequest;
+import com.salah.booknest.model.request.RegisterRequest;
 import com.salah.booknest.model.response.LoginResponse;
 import com.salah.booknest.repository.UserRepository;
 import com.salah.booknest.security.JWTUtils;
@@ -37,39 +38,66 @@ public class UserService {
         this.myUserDetails = myUserDetails;
     }
 
-    public User createUser(User userObject){
-        System.out.println("calling createUser()");
-        if(userRepository.existsByUsername(userObject.getUsername())){
-            throw new InformationExistException("User with username " + userObject.getUsername() + " already exists");
-        } else if (userRepository.existsByEmailAddress(userObject.getEmailAddress())){
-            throw new InformationExistException("User with Email address " + userObject.getEmailAddress() + " already exists");
-        } else {
-            userObject.setPassword(passwordEncoder.encode(userObject.getPassword()));
-            return userRepository.save(userObject);
-        }
+    //Find user services
+
+    public User findUserById(Long userId){
+        System.out.println("Finding user by ID");
+        return userRepository.findUserById(userId);
     }
 
     public User findUserByUsername(String username){
         System.out.println("Finding user by username " + username);
         return userRepository.findUserByUsername(username);
-
     }
 
-    public ResponseEntity<?> loginUser(LoginRequest loginRequest){
-        try {
-            System.out.println(loginRequest.getUsername());
-            Authentication authentication = authenticationManager
-                    .authenticate(new UsernamePasswordAuthenticationToken(
-                            loginRequest.getUsername(),
-                            loginRequest.getPassword())
-                    );
-            SecurityContextHolder.getContext().setAuthentication(authentication);
-            myUserDetails = (MyUserDetails) authentication.getPrincipal();
-            final String JWT = jwtUtils.generateJwtToken(myUserDetails);
-            return ResponseEntity.ok(new LoginResponse(JWT));
-        } catch (Exception e){
-            System.out.println(loginRequest.getUsername());
-            return ResponseEntity.ok(new LoginResponse("Error: username or password is incorrect. ERROR: " + e));
+
+
+    public User createUser(RegisterRequest request){
+        System.out.println("service calling createUser()");
+        if(userRepository.existsByUsername(request.getUsername())){
+            throw new InformationExistException("User with username " + request.getUsername() + " already exists");
+        } else if (userRepository.existsByEmailAddress(request.getEmailAddress())){
+            throw new InformationExistException("User with Email address " + request.getEmailAddress() + " already exists");
+        } else {
+            User user = new User();
+            user.setUsername(request.getUsername());
+            user.setEmailAddress(request.getEmailAddress());
+            user.setUserProfile(request.getUserProfile());
+
+            user.setPassword(passwordEncoder.encode(request.getPassword()));
+
+            return userRepository.save(user);
         }
+    }
+
+
+    public ResponseEntity<LoginResponse> loginUser(LoginRequest loginRequest) {
+        System.out.println("Processing login for: " + loginRequest.getUsername());
+
+        Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(
+                        loginRequest.getUsername(),
+                        loginRequest.getPassword()
+                )
+        );
+
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+
+        MyUserDetails principalDetails = (MyUserDetails) authentication.getPrincipal();
+        User dbUser = principalDetails.getUser();
+
+        //generate jwt
+        final String jwt = jwtUtils.generateJwtToken(principalDetails);
+
+        // create user summary for front end
+        LoginResponse.UserSummary summary = new LoginResponse.UserSummary(
+                dbUser.getId(),
+                dbUser.getUsername(),
+                dbUser.getEmailAddress(),
+                dbUser.getRole(),
+                dbUser.getIsActive()
+        );
+
+        return ResponseEntity.ok(new LoginResponse(jwt, summary));
     }
 }

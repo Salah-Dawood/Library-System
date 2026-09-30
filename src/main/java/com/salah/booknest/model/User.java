@@ -3,6 +3,7 @@ package com.salah.booknest.model;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 import java.time.LocalDateTime;
@@ -31,7 +32,16 @@ public class User {
     private String password;
 
     @Column
-    private String role;
+    @ColumnDefault("'Member'")
+    private String role = "Member";
+
+    @Column
+    @ColumnDefault("true")
+    private Boolean isActive = true;
+
+    @Column
+    @ColumnDefault("false")
+    private Boolean isVerified = false;
 
     @Column
     @CreationTimestamp
