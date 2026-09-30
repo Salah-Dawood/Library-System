@@ -135,7 +135,7 @@ public class UserService {
         userRepository.save(user);
 
         // 5. Return a user-friendly browser response string
-        return ResponseEntity.ok("Success! Your password has been updated to: " + password +
-                ". You can close this tab and log in now.");
+        return ResponseEntity.ok("Success! Your password has been updated\n" +
+                "You can close this tab and log in now.");
     }
 }

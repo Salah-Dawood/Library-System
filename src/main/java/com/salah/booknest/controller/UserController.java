@@ -1,6 +1,7 @@
 package com.salah.booknest.controller;
 
 import com.salah.booknest.model.User;
+import com.salah.booknest.model.request.ChangePasswordRequest;
 import com.salah.booknest.model.request.LoginRequest;
 import com.salah.booknest.model.request.RegisterRequest;
 import com.salah.booknest.service.UserService;
@@ -29,12 +30,11 @@ public class UserController {
         return userService.loginUser(loginRequest);
     }
 
-    @GetMapping("/passwordreset/{token}/{password}")
+    @PutMapping("/passwordreset/{token}")
     public ResponseEntity<String> executePasswordReset(
             @PathVariable("token") String token,
-            @PathVariable("password") String password) {
-        return userService.executePasswordReset(token,password);
-
+            @RequestBody ChangePasswordRequest changePasswordRequest) {
+        return userService.executePasswordReset(token, changePasswordRequest.getNewPassword());
     }
 
 

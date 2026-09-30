@@ -96,7 +96,8 @@ public class EmailVerificationService {
         String token = jwtUtils.generatePasswordResetToken(username);
         String text = "Ignore this email if did not initiate the password reset process\n" +
                 "Click the folliwing link to reset you password:\n" +
-                root + "/auth/users/passwordreset/" + token + "/" + password + "\nyour password will be set to " + password;
+                root + "/reset.html?token=" + token + "\n\n" +
+                "api link: " + root + "/auth/users/passwordreset/";
         sendEmail(email,subject,text);
         return "yooho";
     }
