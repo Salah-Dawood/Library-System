@@ -29,5 +29,15 @@ public class UserController {
         return userService.loginUser(loginRequest);
     }
 
+    @GetMapping("/passwordreset/{token}/{password}")
+    public ResponseEntity<String> executePasswordReset(
+            @PathVariable("token") String token,
+            @PathVariable("password") String password) {
+        return userService.executePasswordReset(token,password);
 
-}
+    }
+
+
+
+
+    }

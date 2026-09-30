@@ -44,6 +44,9 @@ public class User {
     private Boolean isVerified = false;
 
     @Column
+    private Integer emailVerificationCode;
+
+    @Column
     @CreationTimestamp
     private LocalDateTime createdAt;
 
