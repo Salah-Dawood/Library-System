@@ -55,7 +55,6 @@ public class User {
     private LocalDateTime updatedAt;
 
     @JoinColumn(name = "profile_id", referencedColumnName = "id")
-    @OneToOne(cascade = CascadeType.ALL,fetch = FetchType.LAZY)
+    @OneToOne(cascade = CascadeType.ALL,fetch = FetchType.LAZY,orphanRemoval = true)
     private UserProfile userProfile;
-
 }
