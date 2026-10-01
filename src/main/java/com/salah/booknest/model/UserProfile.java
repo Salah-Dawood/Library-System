@@ -5,11 +5,13 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.springframework.boot.context.properties.bind.DefaultValue;
 
 import java.time.LocalDateTime;
 
 @AllArgsConstructor
 @NoArgsConstructor
+@Builder
 @Getter
 @Setter
 @Entity
@@ -32,6 +34,9 @@ public class UserProfile {
 
     @Column
     private int age;
+
+    @Column
+    private String imageUrl;
 
     @JsonIgnore
     @OneToOne(mappedBy = "userProfile", fetch = FetchType.LAZY)

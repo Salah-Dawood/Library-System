@@ -3,6 +3,7 @@ package com.salah.booknest.service;
 import com.salah.booknest.exception.InformationExistException;
 import com.salah.booknest.exception.InformationNotFoundException;
 import com.salah.booknest.model.User;
+import com.salah.booknest.model.UserProfile;
 import com.salah.booknest.model.request.LoginRequest;
 import com.salah.booknest.model.request.RegisterRequest;
 import com.salah.booknest.model.response.LoginResponse;
@@ -21,7 +22,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.ErrorResponse;
 
-import java.util.Random;
 
 @Service
 public class UserService {
@@ -123,18 +123,14 @@ public class UserService {
                     .body("Failed to reset password: Link has expired or is invalid.");
         }
 
-        // 2. Extract the username embedded inside the token payload
         String username = jwtUtils.getUserNameFromJwtToken(token);
 
-        // 3. Find the user in the database
         User user = userRepository.findUserByUsername(username)
                 .orElseThrow(() -> new InformationNotFoundException("Username " + username + " not found"));
 
-        // 4. Encrypt the password parameter and save it
         user.setPassword(passwordEncoder.encode(password));
         userRepository.save(user);
 
-        // 5. Return a user-friendly browser response string
         return ResponseEntity.ok("Success! Your password has been updated\n" +
                 "You can close this tab and log in now.");
     }
