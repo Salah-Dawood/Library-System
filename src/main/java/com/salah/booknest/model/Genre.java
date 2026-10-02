@@ -37,6 +37,7 @@ public class Genre {
 
     @Column
     @ManyToMany(mappedBy = "genres")
+    @JsonIgnore
     private Set<Book> books = new HashSet<>();
 
     @OneToOne
