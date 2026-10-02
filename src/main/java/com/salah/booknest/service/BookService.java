@@ -2,8 +2,10 @@ package com.salah.booknest.service;
 
 import com.salah.booknest.exception.InformationExistException;
 import com.salah.booknest.exception.InformationNotFoundException;
+import com.salah.booknest.model.Author;
 import com.salah.booknest.model.Book;
 import com.salah.booknest.model.Genre;
+import com.salah.booknest.repository.AuthorRepository;
 import com.salah.booknest.repository.BookRepository;
 import com.salah.booknest.repository.GenreRepository;
 import org.springframework.http.HttpStatus;
@@ -16,11 +18,14 @@ import java.util.List;
 public class BookService {
     private final BookRepository bookRepository;
     private final GenreRepository genreRepository;
+    private final AuthorRepository authorRepository;
 
     public BookService(BookRepository bookRepository,
-                       GenreRepository genreRepository) {
+                       GenreRepository genreRepository,
+                       AuthorRepository authorRepository) {
         this.bookRepository = bookRepository;
         this.genreRepository = genreRepository;
+        this.authorRepository = authorRepository;
     }
 
 
@@ -51,9 +56,16 @@ public class BookService {
 
         Book book = new Book();
         book.setTitle(bookObject.getTitle());
-        book.setAuthor(bookObject.getAuthor());
         book.setIsbn(bookObject.getIsbn());
         book.setPublishedYear(bookObject.getPublishedYear());
+
+        if (bookObject.getAuthor() != null && bookObject.getAuthor().getId() != null) {
+            Author managedAuthor = authorRepository.findById(bookObject.getAuthor().getId())
+                    .orElseThrow(() -> new InformationNotFoundException("Author not found with ID: " + bookObject.getAuthor().getId()));
+            book.setAuthor(managedAuthor);
+        } else {
+            throw new IllegalArgumentException("Author ID must be provided");
+        }
 
         if (bookObject.getGenres() != null && !bookObject.getGenres().isEmpty()) {
             for (Genre requestedGenre : bookObject.getGenres()) {

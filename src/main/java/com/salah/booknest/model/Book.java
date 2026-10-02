@@ -1,5 +1,6 @@
 package com.salah.booknest.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -28,8 +29,10 @@ public class Book {
     @Column(nullable = false)
     private String title;
 
-    @Column(nullable = false)
-    private String author;
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "author_id", nullable = false)
+    @JsonIgnoreProperties("books")
+    private Author author;
 
     @Column(nullable = false)
     private String isbn;
@@ -51,6 +54,6 @@ public class Book {
             joinColumns = @JoinColumn(name = "book_id"),
             inverseJoinColumns = @JoinColumn(name = "genre_id")
     )
+    @JsonIgnoreProperties("books")
     private Set<Genre> genres = new HashSet<>();
-
 }
