@@ -6,14 +6,16 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+
 
 @AllArgsConstructor
 @NoArgsConstructor
-@ToString
 @Getter
 @Setter
 @Entity
 @Table(name = "loans")
+@ToString(exclude = {"user", "book", "decidedBy"})
 public class Loan {
 
     @Id
@@ -28,20 +30,38 @@ public class Loan {
     @JoinColumn(name = "book_id", nullable = false)
     private Book book;
 
-    @Column(name = "loan_date", nullable = false)
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private LoanStatus status = LoanStatus.REQUESTED;
+
+
+    @Column(name = "requested_days", nullable = false)
+    private Integer requestedDays;
+
+    @Column(name = "loan_date")
     private LocalDate loanDate;
 
-    @Column(name = "due_date", nullable = false)
+    @Column(name = "due_date")
     private LocalDate dueDate;
 
     @Column(name = "return_date")
     private LocalDate returnDate;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "decided_by")
+    private User decidedBy;
+
+    @Column(name = "decided_at")
+    private LocalDateTime decidedAt;
+
+    @Column(name = "rejection_reason")
+    private String rejectionReason;
+
     @CreationTimestamp
-    @Column(name = "created_at")
-    private String createdAt;
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
 
     @UpdateTimestamp
     @Column(name = "updated_at")
-    private String updatedAt;
+    private LocalDateTime updatedAt;
 }

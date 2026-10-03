@@ -2,6 +2,7 @@ package com.salah.booknest.service;
 
 import com.salah.booknest.exception.InformationNotFoundException;
 import com.salah.booknest.model.User;
+import com.salah.booknest.model.response.LoginResponse;
 import com.salah.booknest.repository.UserRepository;
 import com.salah.booknest.security.JWTUtils;
 import com.salah.booknest.security.MyUserDetails;
@@ -10,6 +11,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -19,6 +21,12 @@ public class LibrarianService {
 
     public LibrarianService(UserRepository userRepository){
         this.userRepository = userRepository;
+    }
+
+    public List<LoginResponse.UserSummary> getUsers() {
+        return userRepository.findAll().stream()
+                .map(u -> new LoginResponse.UserSummary(u.getId(), u.getUsername(),
+                        u.getEmailAddress(), u.getRole(), u.getIsActive())).toList();
     }
 
     public User deactivateUser(Long userId){

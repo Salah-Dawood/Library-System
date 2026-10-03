@@ -3,6 +3,7 @@ package com.salah.booknest.controller;
 import com.salah.booknest.model.Author;
 import com.salah.booknest.service.AuthorService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -32,6 +33,7 @@ public class AuthorController {
     }
 
     @PostMapping("")
+    @PreAuthorize("hasRole('librarian')")
     public ResponseEntity<?> createAuthor(@RequestBody Author authorObject){
         return authorService.createAuthor(authorObject);
     }

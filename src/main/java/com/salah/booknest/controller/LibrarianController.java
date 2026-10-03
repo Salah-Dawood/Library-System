@@ -1,11 +1,15 @@
 package com.salah.booknest.controller;
 
 import com.salah.booknest.model.User;
+import com.salah.booknest.model.response.LoginResponse;
 import com.salah.booknest.service.LibrarianService;
 import com.salah.booknest.service.UserService;
+import lombok.Getter;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/librarian")
@@ -16,6 +20,9 @@ public class LibrarianController {
     public LibrarianController(LibrarianService librarianService) {
         this.librarianService = librarianService;
     }
+
+    @GetMapping("/users")
+    public List<LoginResponse.UserSummary> getUsers() { return librarianService.getUsers(); }
 
 
     @DeleteMapping("/users/delete/{userId}")
@@ -32,8 +39,8 @@ public class LibrarianController {
     }
 
     @PutMapping("/users/activate/{userId}")
-    public User activateUser(@PathVariable Long userID){
+    public User activateUser(@PathVariable Long userId){
         System.out.println("calling softDeleteUser()");
-        return librarianService.deactivateUser(userID);
+        return librarianService.deactivateUser(userId);
     }
 }
