@@ -10,7 +10,9 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 @AllArgsConstructor
@@ -59,5 +61,8 @@ public class Book {
     @OneToOne(mappedBy = "book", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIgnoreProperties("book")
     private Inventory inventory;
+
+    @OneToMany(mappedBy = "book", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Loan> loans = new ArrayList<>();
 
 }
