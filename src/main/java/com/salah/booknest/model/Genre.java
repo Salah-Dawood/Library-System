@@ -38,11 +38,6 @@ public class Genre {
     @Column
     @ManyToMany(mappedBy = "genres")
     private Set<Book> books = new HashSet<>();
-
-    @OneToOne
-    @JsonIgnore
-    @JoinColumn(name = "user_id")
-    private User user;
 }
 
 

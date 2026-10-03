@@ -1,6 +1,8 @@
 package com.salah.booknest.controller;
 
 import com.salah.booknest.model.Book;
+import com.salah.booknest.model.request.CreateBookRequest;
+import com.salah.booknest.model.response.BookResponse;
 import com.salah.booknest.service.BookService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -19,25 +21,29 @@ public class BookController {
     }
 
     @GetMapping("")
-    public List<Book> getBooks(){
+    public List<BookResponse> getBooks(){
         return bookService.getBooks();
     }
 
     @GetMapping("/{bookId}")
-    public Book getBookById(@PathVariable Long bookId){
+    public BookResponse getBookById(@PathVariable Long bookId){
         return bookService.getBookById(bookId);
     }
 
     @GetMapping("/search/{title}")
-    public Book getBookByTitle(@PathVariable String title){
+    public BookResponse getBookByTitle(@PathVariable String title){
         return bookService.getBookByTitle(title);
     }
 
     @PostMapping("")
     @PreAuthorize("hasRole('librarian')")
-    public ResponseEntity<?> createBook(@RequestBody Book bookObject){
-        return bookService.createBook(bookObject);
+    public ResponseEntity<?> createBook(@RequestBody CreateBookRequest request){
+        return bookService.createBook(request);
     }
 
-
+    @DeleteMapping("/{bookId}")
+    @PreAuthorize("hasRole('librarian')")
+    public ResponseEntity<?> deleteBook(@PathVariable Long bookId){
+        return bookService.deleteBook(bookId);
+    }
 }
