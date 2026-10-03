@@ -2,6 +2,7 @@ package com.salah.booknest.model;
 
 import java.util.Set;
 
+
 public enum LoanStatus {
     REQUESTED,
     APPROVED,

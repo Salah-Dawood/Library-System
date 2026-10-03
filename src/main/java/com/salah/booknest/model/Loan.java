@@ -22,6 +22,7 @@ public class Loan {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** The member who requested the book. */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
@@ -33,7 +34,6 @@ public class Loan {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private LoanStatus status = LoanStatus.REQUESTED;
-
 
     @Column(name = "requested_days", nullable = false)
     private Integer requestedDays;

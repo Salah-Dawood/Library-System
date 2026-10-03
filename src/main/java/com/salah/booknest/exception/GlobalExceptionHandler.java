@@ -1,0 +1,81 @@
+package com.salah.booknest.exception;
+
+import com.salah.booknest.model.response.ApiError;
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+
+import java.time.LocalDateTime;
+
+/** Turns every exception into the {@link ApiError} format and keeps stack traces out of responses. */
+@Slf4j
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+
+    @ExceptionHandler(InformationNotFoundException.class)
+    public ResponseEntity<ApiError> notFound(InformationNotFoundException ex, HttpServletRequest req) {
+        return build(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", ex.getMessage(), req);
+    }
+
+    @ExceptionHandler(InformationExistException.class)
+    public ResponseEntity<ApiError> alreadyExists(InformationExistException ex, HttpServletRequest req) {
+        return build(HttpStatus.CONFLICT, "RESOURCE_ALREADY_EXISTS", ex.getMessage(), req);
+    }
+
+    @ExceptionHandler(InvalidStateException.class)
+    public ResponseEntity<ApiError> invalidState(InvalidStateException ex, HttpServletRequest req) {
+        return build(HttpStatus.CONFLICT, "INVALID_STATE", ex.getMessage(), req);
+    }
+
+    @ExceptionHandler(InvalidRequestException.class)
+    public ResponseEntity<ApiError> invalidRequest(InvalidRequestException ex, HttpServletRequest req) {
+        return build(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", ex.getMessage(), req);
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiError> accessDenied(AccessDeniedException ex, HttpServletRequest req) {
+        return build(HttpStatus.FORBIDDEN, "ACCESS_DENIED",
+                "You do not have permission to perform this action", req);
+    }
+
+    /** Thrown by the login call when the username or password is wrong. */
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ApiError> authenticationFailed(AuthenticationException ex, HttpServletRequest req) {
+        log.warn("Failed authentication attempt on {}", req.getRequestURI());
+        return build(HttpStatus.UNAUTHORIZED, "AUTHENTICATION_FAILED", "Invalid username or password", req);
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiError> unreadableBody(HttpMessageNotReadableException ex, HttpServletRequest req) {
+        return build(HttpStatus.BAD_REQUEST, "MALFORMED_REQUEST", "Request body is missing or malformed", req);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiError> badParameter(MethodArgumentTypeMismatchException ex, HttpServletRequest req) {
+        return build(HttpStatus.BAD_REQUEST, "INVALID_PARAMETER",
+                "Invalid value for parameter '" + ex.getName() + "'", req);
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ApiError> unexpected(Exception ex, HttpServletRequest req) {
+        // Spring's own web exceptions (404 for unknown URLs, 405, ...) already know their status.
+        if (ex instanceof org.springframework.web.ErrorResponse springError) {
+            HttpStatus status = HttpStatus.valueOf(springError.getStatusCode().value());
+            return build(status, status.name(), status.getReasonPhrase(), req);
+        }
+        log.error("Unhandled exception on {}", req.getRequestURI(), ex);
+        return build(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "An unexpected error occurred", req);
+    }
+
+    private ResponseEntity<ApiError> build(HttpStatus status, String error, String message, HttpServletRequest req) {
+        ApiError body = new ApiError(LocalDateTime.now(), status.value(), error, message, req.getRequestURI());
+        return ResponseEntity.status(status).body(body);
+    }
+}
