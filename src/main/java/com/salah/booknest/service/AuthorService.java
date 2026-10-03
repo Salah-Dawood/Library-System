@@ -41,4 +41,30 @@ public class AuthorService {
         authorRepository.save(authorObject);
         return new ResponseEntity<>(authorObject, HttpStatus.CREATED);
     }
+
+    public ResponseEntity<?> updateAuthor(Long authorId,Author authorObject){
+        if (authorRepository.existsByName(authorObject.getName())){
+            throw new InformationExistException("Author with name " + authorObject.getName() + " already exists");
+        }
+        Author updatedAuthor = authorRepository.findById(authorId)
+                .orElseThrow(() -> new InformationNotFoundException("Author with ID " + authorId + " is does not exist"));
+
+        if (authorObject.getName() != null){
+            updatedAuthor.setName(authorObject.getName());
+        }
+        if (authorObject.getBirthYear() != null){
+            updatedAuthor.setBirthYear(authorObject.getBirthYear());
+        }
+        if (authorObject.getNationality() != null){
+            updatedAuthor.setNationality(authorObject.getNationality());
+        }
+        authorRepository.save(updatedAuthor);
+        return new ResponseEntity<>(authorObject, HttpStatus.OK);
+    }
+
+    public ResponseEntity<?> deleteAuthor(Long authorId){
+        authorRepository.deleteById(authorId);
+        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+
+    }
 }

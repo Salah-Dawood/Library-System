@@ -8,8 +8,8 @@ import java.util.List;
 public class CreateBookRequest {
     private String title;
     private String isbn;
-    private int publishedYear;
+    private Integer publishedYear;
     private Long authorId;
-    private int totalCopies;
+    private Integer totalCopies;
     private List<Long> genreIds;
 }

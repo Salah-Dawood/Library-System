@@ -48,6 +48,27 @@ public class GenreService {
         return new ResponseEntity<> (genre, HttpStatus.CREATED);
     }
 
+    public ResponseEntity<?> updateGenre(Long genreId,Genre genreObject){
+        if (genreObject.getName() !=null) {
+            genreRepository.findByName(genreObject.getName())
+                    .ifPresent(existingGenre -> {
+                        throw new InformationExistException("Genre with name " + genreObject.getName() + " already exists");
+                    });
+        }
+
+        Genre updatedGenre = genreRepository.getById(genreId);
+
+        if (genreObject.getName() != null){
+            updatedGenre.setName(genreObject.getName());
+        }
+        if (genreObject.getDescription()!=null){
+            updatedGenre.setDescription(genreObject.getDescription());
+        }
+        genreRepository.save(updatedGenre);
+        return new ResponseEntity<> (updatedGenre, HttpStatus.OK);
+
+    }
+
     public ResponseEntity<?> deleteGenre(Long genreId){
         Genre genre = genreRepository.findById(genreId)
                 .orElseThrow(() -> new InformationNotFoundException("genre with id " + genreId + " not found"));

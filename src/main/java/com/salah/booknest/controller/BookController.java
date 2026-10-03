@@ -41,6 +41,13 @@ public class BookController {
         return bookService.createBook(request);
     }
 
+    @PutMapping("/{bookId}")
+    @PreAuthorize("hasRole('librarian')")
+    public ResponseEntity updateBook(@PathVariable Long bookId,
+                                     @RequestBody CreateBookRequest request){
+        return bookService.updateBook(bookId,request);
+    }
+
     @DeleteMapping("/{bookId}")
     @PreAuthorize("hasRole('librarian')")
     public ResponseEntity<?> deleteBook(@PathVariable Long bookId){

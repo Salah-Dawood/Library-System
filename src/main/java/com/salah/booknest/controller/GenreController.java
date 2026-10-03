@@ -45,4 +45,11 @@ public class GenreController {
         System.out.println("calling deleteGenre()");
         return genreService.deleteGenre(genreId);
     }
+
+    @PutMapping("/{genreId}")
+    @PreAuthorize("hasRole('librarian')")
+    public ResponseEntity<?> updateGenre(@PathVariable Long genreId,
+                                         @RequestBody Genre genreObject){
+        return genreService.updateGenre(genreId,genreObject);
+    }
 }

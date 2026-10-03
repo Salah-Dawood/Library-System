@@ -38,4 +38,17 @@ public class AuthorController {
         return authorService.createAuthor(authorObject);
     }
 
+    @PutMapping("/{authorId}")
+    @PreAuthorize("hasRole('librarian')")
+    public ResponseEntity<?> updateAuthor(@PathVariable Long authorId,
+                                          @RequestBody Author authorObject){
+        return authorService.updateAuthor(authorId,authorObject);
+    }
+
+    @DeleteMapping("/{authorId}")
+    @PreAuthorize("hasRole('librarian')")
+    public ResponseEntity<?> deleteAuthor(@PathVariable Long authorId){
+        return authorService.deleteAuthor(authorId);
+    }
+
 }

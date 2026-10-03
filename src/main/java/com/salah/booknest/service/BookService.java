@@ -124,10 +124,57 @@ public class BookService {
         return new ResponseEntity<>(savedBook, HttpStatus.CREATED);
     }
 
+    public ResponseEntity<?> updateBook(Long bookId,CreateBookRequest request){
+
+        Book book = bookRepository.findById(bookId).orElseThrow(() -> new InformationNotFoundException("Book with ID " + bookId + " not found"));
+
+       if (request.getIsbn() !=null) {
+           bookRepository.findByIsbn(request.getIsbn())
+                   .ifPresent(existingBook -> {
+                       throw new InformationExistException("Book with ISBN " + request.getIsbn() + " already exists");
+                   });
+       }
+
+        // book info
+        if (request.getTitle()!=null) {
+            book.setTitle(request.getTitle());
+        }
+        if (request.getIsbn() != null) {
+            book.setIsbn(request.getIsbn());
+        }
+        if (request.getPublishedYear() != null) {
+            book.setPublishedYear(request.getPublishedYear());
+        }
+        if (request.getAuthorId() != null) {
+            Author author = authorRepository.findById(request.getAuthorId())
+                    .orElseThrow(() -> new InformationNotFoundException("Author not found with ID: " + request.getAuthorId()));
+        }
+
+        Set<Genre> genres = new HashSet<>();
+        if (request.getGenreIds() != null && !request.getGenreIds().isEmpty()) {
+            for (Long genreId : request.getGenreIds()) {
+                genres.add(genreRepository.findById(genreId).orElseThrow(() -> new InformationNotFoundException("Genre with id " + genreId + " not found")));
+            }
+
+            book.setGenres(genres);
+        }
+
+        Inventory inventory = book.getInventory();
+        inventory.setTotalCopies(request.getTotalCopies());
+
+        Book savedBook = bookRepository.save(book);
+
+        return new ResponseEntity<>(savedBook, HttpStatus.OK);
+    }
+
     public ResponseEntity<?> deleteBook(Long bookId){
         bookRepository.deleteById(bookId);
         return new ResponseEntity<>("Book Deleted",HttpStatus.NO_CONTENT);
     }
+
+
+    //helper methods
+
 
 
 }
