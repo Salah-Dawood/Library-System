@@ -17,7 +17,7 @@ public class CreateBookRequest {
     @NotBlank(message = "ISBN can not be blank")
     private String isbn;
 
-    private int publishedYear;
+    private Integer publishedYear;
 
     // published year validation
     @AssertTrue(message = "Published year hasn't happened yet!!")

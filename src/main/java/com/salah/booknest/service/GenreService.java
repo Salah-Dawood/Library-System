@@ -48,7 +48,6 @@ public class GenreService {
         return new ResponseEntity<> (genre, HttpStatus.CREATED);
     }
 
-    /** Edits only the fields that are sent. The name must stay unique, but a genre may keep its own. */
     public ResponseEntity<?> updateGenre(Long genreId, Genre genreObject) {
         Genre genre = genreRepository.findById(genreId)
                 .orElseThrow(() -> new InformationNotFoundException("Genre with ID " + genreId + " not found"));
@@ -66,7 +65,6 @@ public class GenreService {
         return new ResponseEntity<>(genreRepository.save(genre), HttpStatus.OK);
     }
 
-    /** A genre that books still use cannot be deleted; remove it from those books first. */
     @Transactional
     public ResponseEntity<?> deleteGenre(Long genreId) {
         Genre genre = genreRepository.findById(genreId)

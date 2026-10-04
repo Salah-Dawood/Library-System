@@ -2,23 +2,23 @@ package com.salah.booknest.service.auditchannels;
 
 import com.salah.booknest.model.request.AuditTriggerInfo;
 import com.salah.booknest.repository.AuditLogRepository;
-import com.salah.booknest.repository.BookRepository;
+import com.salah.booknest.repository.LoanRepository;
 import org.springframework.stereotype.Component;
 
 @Component
-public class BookChannel implements AuditChannel {
+public class LoanChannel implements AuditChannel {
 
     private final AuditLogRepository auditLogRepository;
-    private final BookRepository bookRepository;
+    private final LoanRepository loanRepository;
 
-    public BookChannel(AuditLogRepository auditLogRepository, BookRepository bookRepository) {
+    public LoanChannel(AuditLogRepository auditLogRepository, LoanRepository loanRepository) {
         this.auditLogRepository = auditLogRepository;
-        this.bookRepository = bookRepository;
+        this.loanRepository = loanRepository;
     }
 
     @Override
     public boolean supports(String type) {
-        return "BOOK".equals(type);
+        return "LOAN".equals(type);
     }
 
     @Override
@@ -28,9 +28,9 @@ public class BookChannel implements AuditChannel {
 
     @Override
     public String getReadableLog(AuditTriggerInfo info) {
-        String target = bookRepository.findById(info.whatId())
-                .map(b -> "book '" + b.getTitle() + "' (id " + b.getId() + ")")
-                .orElse("book #" + info.whatId());
+        String target = loanRepository.findById(info.whatId())
+                .map(l -> "loan #" + l.getId() + " of '" + l.getBook().getTitle() + "' for " + l.getUser().getUsername())
+                .orElse("loan #" + info.whatId());
         return info.action().toLowerCase() + " " + target;
     }
 }

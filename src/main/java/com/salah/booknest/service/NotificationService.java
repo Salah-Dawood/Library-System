@@ -55,7 +55,7 @@ public class NotificationService {
         try {
             emitter.send(SseEmitter.event().name(event.type()).data(event));
         } catch (IOException | IllegalStateException e) {
-            // The client went away; drop this connection instead of failing the business operation.
+            // The client went away drop this connection
             remove(username, emitter);
         }
     }

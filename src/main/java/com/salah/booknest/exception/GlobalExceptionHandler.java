@@ -81,7 +81,6 @@ public class GlobalExceptionHandler {
                 "The request conflicts with existing data, for example the item is still in use", req);
     }
 
-    /** A client closed its notification stream; there is nothing to report and no response can be written. */
     @ExceptionHandler(AsyncRequestNotUsableException.class)
     public void clientDisconnected() {
         log.debug("Client disconnected from a streaming response");

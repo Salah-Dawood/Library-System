@@ -73,7 +73,6 @@ public class EmailVerificationService {
         return 1000 + random.nextInt(9000);
     }
 
-    /** @throws InvalidRequestException when the code is wrong or no code was ever sent */
     public String verifyEmail(String username, int code) {
         User user = userRepository.findUserByUsername(username)
                 .orElseThrow(() -> new InformationNotFoundException("Username " + username + " not found"));

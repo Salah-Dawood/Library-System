@@ -28,19 +28,22 @@ public class UserService {
     private final AuthenticationManager authenticationManager;
     private MyUserDetails myUserDetails;
     private EmailVerificationService emailVerificationService;
+    private final AuditLogService auditLogService;
 
     public UserService(UserRepository userRepository,
                        @Lazy PasswordEncoder passwordEncoder,
                        JWTUtils jwtUtils,
                        @Lazy AuthenticationManager authenticationManager,
                        @Lazy MyUserDetails myUserDetails,
-                       EmailVerificationService emailVerificationService){
+                       EmailVerificationService emailVerificationService,
+                       AuditLogService auditLogService){
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtils = jwtUtils;
         this.authenticationManager = authenticationManager;
         this.myUserDetails = myUserDetails;
         this.emailVerificationService = emailVerificationService;
+        this.auditLogService = auditLogService;
     }
 
     //Find user services
@@ -69,7 +72,9 @@ public class UserService {
             user.setUserProfile(request.getUserProfile());
             user.setPassword(passwordEncoder.encode(request.getPassword()));
 
-            return userRepository.save(user);
+            User saved = userRepository.save(user);
+            auditLogService.logAs("USER", saved.getId(), "REGISTERED", saved.getId());
+            return saved;
         }
     }
 

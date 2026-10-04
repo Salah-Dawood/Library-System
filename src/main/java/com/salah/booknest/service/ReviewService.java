@@ -17,7 +17,6 @@ import com.salah.booknest.repository.ReviewRepository;
 import com.salah.booknest.repository.UserRepository;
 import com.salah.booknest.security.Roles;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -25,7 +24,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ReviewService {
@@ -38,6 +36,7 @@ public class ReviewService {
     private final BookRepository bookRepository;
     private final UserRepository userRepository;
     private final LoanRepository loanRepository;
+    private final AuditLogService auditLogService;
 
     @Transactional(readOnly = true)
     public ReviewSummary getBookReviews(Long bookId, Authentication authentication) {
@@ -79,7 +78,7 @@ public class ReviewService {
         review.setComment(comment);
         review = reviewRepository.save(review);
 
-        log.info("User {} reviewed book {} with rating {}", user.getUsername(), bookId, request.rating());
+        auditLogService.log("REVIEW", "CREATED", review.getId());
         return ReviewResponse.from(review, user.getId());
     }
 
@@ -94,7 +93,7 @@ public class ReviewService {
 
         review.setRating(request.rating());
         review.setComment(comment);
-        log.info("User {} edited review {}", user.getUsername(), reviewId);
+        auditLogService.log("REVIEW", "UPDATED", reviewId);
         return ReviewResponse.from(review, user.getId());
     }
 
@@ -105,8 +104,9 @@ public class ReviewService {
         if (!review.getUser().getId().equals(user.getId()) && !Roles.isLibrarian(authentication)) {
             throw new AccessDeniedException("You can only delete your own review");
         }
+        //Audited first so the entry can still name the review it is about.
+        auditLogService.log("REVIEW", "DELETED", reviewId);
         reviewRepository.delete(review);
-        log.info("Review {} deleted by {}", reviewId, user.getUsername());
     }
 
     private String validate(ReviewRequest request) {

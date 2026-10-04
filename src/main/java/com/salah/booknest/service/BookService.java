@@ -28,17 +28,20 @@ public class BookService {
     private final AuthorRepository authorRepository;
     private final InventoryRepository inventoryRepository;
     private final ReviewRepository reviewRepository;
+    private final AuditLogService auditLogService;
 
     public BookService(BookRepository bookRepository,
                        GenreRepository genreRepository,
                        AuthorRepository authorRepository,
                        InventoryRepository inventoryRepository,
-                       ReviewRepository reviewRepository) {
+                       ReviewRepository reviewRepository,
+                       AuditLogService auditLogService) {
         this.bookRepository = bookRepository;
         this.genreRepository = genreRepository;
         this.authorRepository = authorRepository;
         this.inventoryRepository = inventoryRepository;
         this.reviewRepository = reviewRepository;
+        this.auditLogService = auditLogService;
     }
 
     public BookResponse bookResponser(Book book){
@@ -94,6 +97,7 @@ public class BookService {
 
 
     //create book
+    @Transactional
     public ResponseEntity<?> createBook(CreateBookRequest request) {
         if (request.getTotalCopies() == null || request.getTotalCopies() < 0) {
             throw new InvalidRequestException("Total copies must be zero or more");
@@ -137,11 +141,11 @@ public class BookService {
         book.setInventory(inventory);
 
         Book savedBook = bookRepository.save(book);
+        auditLogService.log("BOOK", "CREATED", savedBook.getId());
 
         return new ResponseEntity<>(bookResponser(savedBook), HttpStatus.CREATED);
     }
 
-    /** Edits only the fields that are sent. The ISBN must stay unique, but a book may keep its own. */
     @Transactional
     public ResponseEntity<?> updateBook(Long bookId, CreateBookRequest request) {
         Book book = bookRepository.findById(bookId)
@@ -176,21 +180,23 @@ public class BookService {
         if (request.getTotalCopies() != null) {
             updateTotalCopies(bookId, request.getTotalCopies());
         }
-        return new ResponseEntity<>(bookResponser(bookRepository.save(book)), HttpStatus.OK);
+        Book saved = bookRepository.save(book);
+        auditLogService.log("BOOK", "UPDATED", saved.getId());
+        return new ResponseEntity<>(bookResponser(saved), HttpStatus.OK);
     }
 
+    @Transactional
     public ResponseEntity<Void> deleteBook(Long bookId) {
         if (!bookRepository.existsById(bookId)) {
             throw new InformationNotFoundException("Book with ID " + bookId + " not found");
         }
+        // Audited first so the entry can still name the book it is about.
+        auditLogService.log("BOOK", "DELETED", bookId);
         bookRepository.deleteById(bookId);
         return ResponseEntity.noContent().build();
     }
 
-    /**
-     * Changes the stock while keeping the number of copies currently on loan constant,
-     * so available copies can never exceed the total. The row is locked against concurrent approvals.
-     */
+
     private void updateTotalCopies(Long bookId, int newTotal) {
         Inventory inventory = inventoryRepository.findByBookIdForUpdate(bookId)
                 .orElseThrow(() -> new InformationNotFoundException("Inventory for book " + bookId + " not found"));

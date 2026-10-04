@@ -20,7 +20,6 @@ import com.salah.booknest.repository.LoanRepository;
 import com.salah.booknest.repository.UserRepository;
 import com.salah.booknest.security.Roles;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -32,7 +31,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class LoanService {
@@ -48,6 +46,7 @@ public class LoanService {
     private final BookRepository bookRepository;
     private final InventoryRepository inventoryRepository;
     private final NotificationService notificationService;
+    private final AuditLogService auditLogService;
 
 
     @Transactional(readOnly = true)
@@ -99,7 +98,7 @@ public class LoanService {
         loan.setRequestedDays(days);
         loan = loanRepository.save(loan);
 
-        log.info("Loan {} requested by {} for book {}", loan.getId(), user.getUsername(), book.getId());
+        auditLogService.log("LOAN", "REQUESTED", loan.getId());
         notifyLibrarians(loan, "LOAN_REQUESTED", user.getUsername() + " requested \"" + book.getTitle() + "\"");
         return LoanResponse.from(loan);
     }
@@ -121,7 +120,7 @@ public class LoanService {
         loan.setDueDate(today.plusDays(loan.getRequestedDays()));
         recordDecision(loan, librarian);
 
-        log.info("Loan {} approved by {}", loanId, librarian.getName());
+        auditLogService.log("LOAN", "APPROVED", loanId);
         notifyMember(loan, "LOAN_APPROVED",
                 "Your request for \"" + loan.getBook().getTitle() + "\" was approved. Due " + loan.getDueDate());
         return LoanResponse.from(loan);
@@ -136,7 +135,7 @@ public class LoanService {
         loan.setRejectionReason(reason == null || reason.isBlank() ? null : reason.trim());
         recordDecision(loan, librarian);
 
-        log.info("Loan {} rejected by {}", loanId, librarian.getName());
+        auditLogService.log("LOAN", "REJECTED", loanId);
         notifyMember(loan, "LOAN_REJECTED", "Your request for \"" + loan.getBook().getTitle() + "\" was rejected"
                 + (loan.getRejectionReason() == null ? "" : ": " + loan.getRejectionReason()));
         return LoanResponse.from(loan);
@@ -162,7 +161,7 @@ public class LoanService {
         }
 
         loan.setStatus(LoanStatus.CANCELLED);
-        log.info("Loan {} cancelled by {}", loanId, authentication.getName());
+        auditLogService.log("LOAN", "CANCELLED", loanId);
         if (owner) {
             notifyLibrarians(loan, "LOAN_CANCELLED",
                     actor.getUsername() + " cancelled the request for \"" + loan.getBook().getTitle() + "\"");
@@ -189,7 +188,7 @@ public class LoanService {
         loan.setReturnDate(LocalDate.now());
 
         String timing = describeTiming(ReturnTiming.daysLate(loan.getDueDate(), loan.getReturnDate()));
-        log.info("Loan {} returned by {} ({})", loanId, authentication.getName(), timing);
+        auditLogService.log("LOAN", "RETURNED", loanId);
 
         String title = loan.getBook().getTitle();
         if (owner) {

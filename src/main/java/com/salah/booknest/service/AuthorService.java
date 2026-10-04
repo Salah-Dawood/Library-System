@@ -41,7 +41,6 @@ public class AuthorService {
         return new ResponseEntity<>(authorObject, HttpStatus.CREATED);
     }
 
-    /** Edits only the fields that are sent. The name must stay unique, but an author may keep their own. */
     public ResponseEntity<?> updateAuthor(Long authorId, Author authorObject) {
         Author author = authorRepository.findById(authorId)
                 .orElseThrow(() -> new InformationNotFoundException("Author with ID " + authorId + " does not exist"));

@@ -27,11 +27,14 @@ public class MemberService {
     @Autowired
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AuditLogService auditLogService;
 
     public MemberService(UserRepository userRepository,
-                         PasswordEncoder passwordEncoder) {
+                         PasswordEncoder passwordEncoder,
+                         AuditLogService auditLogService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.auditLogService = auditLogService;
     }
 
     public String changePassword(String username,String password){
@@ -40,6 +43,7 @@ public class MemberService {
 
         user.setPassword(passwordEncoder.encode(password));
         userRepository.save(user);
+        auditLogService.logAs("USER", user.getId(), "PASSWORD_CHANGED", user.getId());
         return "password changed";
     }
 
@@ -70,6 +74,7 @@ public class MemberService {
         }
 
         userRepository.save(user);
+        auditLogService.logAs("USER", user.getId(), "PROFILE_UPDATED", user.getId());
         return "profile should be updated";
     }
 

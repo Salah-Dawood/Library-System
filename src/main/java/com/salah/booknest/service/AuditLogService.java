@@ -1,28 +1,47 @@
 package com.salah.booknest.service;
 
+import com.salah.booknest.model.User;
 import com.salah.booknest.model.request.AuditTriggerInfo;
-import com.salah.booknest.repository.BookRepository;
+import com.salah.booknest.model.response.AuditLogResponse;
+import com.salah.booknest.repository.AuditLogRepository;
 import com.salah.booknest.repository.UserRepository;
 import com.salah.booknest.service.auditchannels.AuditChannel;
+import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.time.LocalDateTime;
 import java.util.List;
-import java.util.logging.Logger;
+
 
 @Service
+@RequiredArgsConstructor
 public class AuditLogService {
-    private final List<AuditChannel> channels;
-    private final UserRepository userRepository;
-    private final BookRepository bookRepository;
-    private final Logger log;
 
-    public AuditLogService(List<AuditChannel> channels, UserRepository userRepository, BookRepository bookRepository, Logger log) {
-        this.channels = channels;
-        this.userRepository = userRepository;
-        this.bookRepository = bookRepository;
-        this.log = log;
+    private static final Logger AUDIT = LoggerFactory.getLogger("AUDIT");
+
+    private final List<AuditChannel> channels;
+    private final AuditLogRepository auditLogRepository;
+    private final UserRepository userRepository;
+
+    @Transactional
+    public void log(String type, String action, Long whatId) {
+        routeLog(new AuditTriggerInfo(type, currentUserId(), whatId, action, LocalDateTime.now()));
     }
 
+    @Transactional
+    public void logAs(String type, Long userId, String action, Long whatId) {
+        routeLog(new AuditTriggerInfo(type, userId, whatId, action, LocalDateTime.now()));
+    }
+
+    @Transactional
     public void routeLog(AuditTriggerInfo info) {
         AuditChannel matchingChannel = channels.stream()
                 .filter(channel -> channel.supports(info.type()))
@@ -30,7 +49,44 @@ public class AuditLogService {
                 .orElseThrow(() -> new IllegalArgumentException("No audit channel found for type " + info.type()));
 
         matchingChannel.processAndSave(info);
-        String readableLog = matchingChannel.getReadableLog(info);
-        log.info(readableLog);
+        String readableLog = describeActor(info.userId()) + " " + matchingChannel.getReadableLog(info);
+        afterCommit(() -> AUDIT.info(readableLog));
+    }
+
+    @Transactional(readOnly = true)
+    public List<AuditLogResponse> getAuditLogs(String type, Long userId) {
+        return auditLogRepository.search(type == null ? null : type.toUpperCase(), userId).stream()
+                .map(AuditLogResponse::from).toList();
+    }
+
+    private Long currentUserId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()
+                || authentication instanceof AnonymousAuthenticationToken) {
+            return null;
+        }
+        return userRepository.findUserByUsername(authentication.getName()).map(User::getId).orElse(null);
+    }
+
+    private String describeActor(Long userId) {
+        if (userId == null) {
+            return "System";
+        }
+        return userRepository.findById(userId)
+                .map(user -> user.getUsername() + " (id " + userId + ")")
+                .orElse("user #" + userId);
+    }
+
+    private void afterCommit(Runnable action) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            action.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                action.run();
+            }
+        });
     }
 }
