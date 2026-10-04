@@ -5,6 +5,7 @@ import com.salah.booknest.model.request.ChangePasswordRequest;
 import com.salah.booknest.model.request.LoginRequest;
 import com.salah.booknest.model.request.RegisterRequest;
 import com.salah.booknest.service.UserService;
+import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -17,7 +18,7 @@ public class UserController {
     private UserService userService;
 
     @PostMapping("/register")
-    public ResponseEntity<User> register(@RequestBody RegisterRequest request) {
+    public ResponseEntity<User> register(@Valid @RequestBody RegisterRequest request) {
 
         User createdUser = userService.createUser(request);
 
@@ -25,7 +26,7 @@ public class UserController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> loginUser(@RequestBody LoginRequest loginRequest){
+    public ResponseEntity<?> loginUser(@Valid @RequestBody LoginRequest loginRequest){
         System.out.println("calling loginUser()");
         return userService.loginUser(loginRequest);
     }

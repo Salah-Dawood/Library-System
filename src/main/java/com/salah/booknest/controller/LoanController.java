@@ -6,6 +6,7 @@ import com.salah.booknest.model.request.RejectLoanRequest;
 import com.salah.booknest.model.response.LoanResponse;
 import com.salah.booknest.model.response.ReturnStats;
 import com.salah.booknest.service.LoanService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -52,7 +53,7 @@ public class LoanController {
 
     @PostMapping
     public ResponseEntity<LoanResponse> requestLoan(Authentication authentication,
-                                                    @RequestBody LoanRequest request) {
+                                                    @Valid @RequestBody LoanRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(loanService.requestLoan(authentication, request));
     }
 

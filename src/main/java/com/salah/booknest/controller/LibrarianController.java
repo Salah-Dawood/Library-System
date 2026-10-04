@@ -1,12 +1,11 @@
 package com.salah.booknest.controller;
 
-import com.salah.booknest.model.User;
 import com.salah.booknest.model.response.LoginResponse;
 import com.salah.booknest.service.LibrarianService;
-import com.salah.booknest.service.UserService;
-import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -14,33 +13,29 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/librarian")
 @PreAuthorize("hasRole('librarian')")
+@RequiredArgsConstructor
 public class LibrarianController {
+
     private final LibrarianService librarianService;
 
-    public LibrarianController(LibrarianService librarianService) {
-        this.librarianService = librarianService;
+    @GetMapping("/users")
+    public List<LoginResponse.UserSummary> getUsers() {
+        return librarianService.getUsers();
     }
 
-    @GetMapping("/users")
-    public List<LoginResponse.UserSummary> getUsers() { return librarianService.getUsers(); }
-
-
     @DeleteMapping("/users/delete/{userId}")
-    public ResponseEntity<?> deleteUser(@PathVariable Long userId){
-        System.out.println("calling deleteUser()");
-        librarianService.deleteUser(userId);
+    public ResponseEntity<Void> deleteUser(@PathVariable Long userId, Authentication authentication) {
+        librarianService.deleteUser(userId, authentication.getName());
         return ResponseEntity.noContent().build();
     }
 
     @PutMapping("/users/deactivate/{userId}")
-    public User deactivateUser(@PathVariable Long userId){
-        System.out.println("calling softDeleteUser()");
-        return librarianService.deactivateUser(userId);
+    public LoginResponse.UserSummary deactivateUser(@PathVariable Long userId, Authentication authentication) {
+        return librarianService.deactivateUser(userId, authentication.getName());
     }
 
     @PutMapping("/users/activate/{userId}")
-    public User activateUser(@PathVariable Long userId){
-        System.out.println("calling softDeleteUser()");
-        return librarianService.activateUser(userId);
+    public LoginResponse.UserSummary activateUser(@PathVariable Long userId, Authentication authentication) {
+        return librarianService.activateUser(userId, authentication.getName());
     }
 }

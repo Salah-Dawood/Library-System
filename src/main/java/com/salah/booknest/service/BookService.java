@@ -2,6 +2,7 @@ package com.salah.booknest.service;
 
 import com.salah.booknest.exception.InformationExistException;
 import com.salah.booknest.exception.InformationNotFoundException;
+import com.salah.booknest.exception.InvalidRequestException;
 import com.salah.booknest.model.Author;
 import com.salah.booknest.model.Book;
 import com.salah.booknest.model.Genre;
@@ -11,9 +12,12 @@ import com.salah.booknest.model.response.BookResponse;
 import com.salah.booknest.repository.AuthorRepository;
 import com.salah.booknest.repository.BookRepository;
 import com.salah.booknest.repository.GenreRepository;
+import com.salah.booknest.repository.InventoryRepository;
+import com.salah.booknest.repository.ReviewRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
 
@@ -22,13 +26,19 @@ public class BookService {
     private final BookRepository bookRepository;
     private final GenreRepository genreRepository;
     private final AuthorRepository authorRepository;
+    private final InventoryRepository inventoryRepository;
+    private final ReviewRepository reviewRepository;
 
     public BookService(BookRepository bookRepository,
                        GenreRepository genreRepository,
-                       AuthorRepository authorRepository) {
+                       AuthorRepository authorRepository,
+                       InventoryRepository inventoryRepository,
+                       ReviewRepository reviewRepository) {
         this.bookRepository = bookRepository;
         this.genreRepository = genreRepository;
         this.authorRepository = authorRepository;
+        this.inventoryRepository = inventoryRepository;
+        this.reviewRepository = reviewRepository;
     }
 
     public BookResponse bookResponser(Book book){
@@ -49,7 +59,11 @@ public class BookService {
         }
 
         response.setGenreNames(genres);
+        response.setTotalCopies(book.getInventory().getTotalCopies());
         response.setAvailableCopies(book.getInventory().getAvailableCopies());
+        response.setReviewCount((int) reviewRepository.countByBookId(book.getId()));
+        Double average = reviewRepository.averageRatingByBookId(book.getId());
+        response.setAverageRating(average == null ? null : Math.round(average * 10) / 10.0);
 
         return response;
     }
@@ -81,6 +95,9 @@ public class BookService {
 
     //create book
     public ResponseEntity<?> createBook(CreateBookRequest request) {
+        if (request.getTotalCopies() == null || request.getTotalCopies() < 0) {
+            throw new InvalidRequestException("Total copies must be zero or more");
+        }
         bookRepository.findByIsbn(request.getIsbn())
                 .ifPresent(existingBook -> {
                     throw new InformationExistException("Book with ISBN " + request.getIsbn() + " already exists");
@@ -98,7 +115,7 @@ public class BookService {
                     .orElseThrow(() -> new InformationNotFoundException("Author not found with ID: " + request.getAuthorId()));
             book.setAuthor(author);
         } else {
-            throw new IllegalArgumentException("Author ID must be provided");
+            throw new InvalidRequestException("Author ID must be provided");
         }
 
         //book genres
@@ -121,58 +138,70 @@ public class BookService {
 
         Book savedBook = bookRepository.save(book);
 
-        return new ResponseEntity<>(savedBook, HttpStatus.CREATED);
+        return new ResponseEntity<>(bookResponser(savedBook), HttpStatus.CREATED);
     }
 
-    public ResponseEntity<?> updateBook(Long bookId,CreateBookRequest request){
+    /** Edits only the fields that are sent. The ISBN must stay unique, but a book may keep its own. */
+    @Transactional
+    public ResponseEntity<?> updateBook(Long bookId, CreateBookRequest request) {
+        Book book = bookRepository.findById(bookId)
+                .orElseThrow(() -> new InformationNotFoundException("Book with ID " + bookId + " not found"));
 
-        Book book = bookRepository.findById(bookId).orElseThrow(() -> new InformationNotFoundException("Book with ID " + bookId + " not found"));
-
-       if (request.getIsbn() !=null) {
-           bookRepository.findByIsbn(request.getIsbn())
-                   .ifPresent(existingBook -> {
-                       throw new InformationExistException("Book with ISBN " + request.getIsbn() + " already exists");
-                   });
-       }
-
-        // book info
-        if (request.getTitle()!=null) {
-            book.setTitle(request.getTitle());
-        }
         if (request.getIsbn() != null) {
+            bookRepository.findByIsbn(request.getIsbn())
+                    .filter(existing -> !existing.getId().equals(bookId))
+                    .ifPresent(existing -> {
+                        throw new InformationExistException("Book with ISBN " + request.getIsbn() + " already exists");
+                    });
             book.setIsbn(request.getIsbn());
+        }
+        if (request.getTitle() != null) {
+            book.setTitle(request.getTitle());
         }
         if (request.getPublishedYear() != null) {
             book.setPublishedYear(request.getPublishedYear());
         }
         if (request.getAuthorId() != null) {
-            Author author = authorRepository.findById(request.getAuthorId())
-                    .orElseThrow(() -> new InformationNotFoundException("Author not found with ID: " + request.getAuthorId()));
-            book.setAuthor(author);
+            book.setAuthor(authorRepository.findById(request.getAuthorId()).orElseThrow(
+                    () -> new InformationNotFoundException("Author not found with ID: " + request.getAuthorId())));
         }
-
-        Set<Genre> genres = new HashSet<>();
-        if (request.getGenreIds() != null && !request.getGenreIds().isEmpty()) {
+        if (request.getGenreIds() != null) {
+            Set<Genre> genres = new HashSet<>();
             for (Long genreId : request.getGenreIds()) {
-                genres.add(genreRepository.findById(genreId).orElseThrow(() -> new InformationNotFoundException("Genre with id " + genreId + " not found")));
+                genres.add(genreRepository.findById(genreId).orElseThrow(
+                        () -> new InformationNotFoundException("Genre with id " + genreId + " not found")));
             }
-
             book.setGenres(genres);
         }
-
-        Inventory inventory = book.getInventory();
-        inventory.setTotalCopies(request.getTotalCopies());
-
-        Book savedBook = bookRepository.save(book);
-
-        return new ResponseEntity<>(savedBook, HttpStatus.OK);
+        if (request.getTotalCopies() != null) {
+            updateTotalCopies(bookId, request.getTotalCopies());
+        }
+        return new ResponseEntity<>(bookResponser(bookRepository.save(book)), HttpStatus.OK);
     }
 
-    public ResponseEntity<?> deleteBook(Long bookId){
+    public ResponseEntity<Void> deleteBook(Long bookId) {
+        if (!bookRepository.existsById(bookId)) {
+            throw new InformationNotFoundException("Book with ID " + bookId + " not found");
+        }
         bookRepository.deleteById(bookId);
-        return new ResponseEntity<>("Book Deleted",HttpStatus.NO_CONTENT);
+        return ResponseEntity.noContent().build();
     }
 
+    /**
+     * Changes the stock while keeping the number of copies currently on loan constant,
+     * so available copies can never exceed the total. The row is locked against concurrent approvals.
+     */
+    private void updateTotalCopies(Long bookId, int newTotal) {
+        Inventory inventory = inventoryRepository.findByBookIdForUpdate(bookId)
+                .orElseThrow(() -> new InformationNotFoundException("Inventory for book " + bookId + " not found"));
+        int onLoan = inventory.getTotalCopies() - inventory.getAvailableCopies();
+        if (newTotal < onLoan) {
+            throw new InvalidRequestException(
+                    "Total copies cannot be lower than the " + onLoan + " copies currently on loan");
+        }
+        inventory.setTotalCopies(newTotal);
+        inventory.setAvailableCopies(newTotal - onLoan);
+    }
 
     //helper methods
 

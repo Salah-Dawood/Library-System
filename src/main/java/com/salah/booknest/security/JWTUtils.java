@@ -1,5 +1,6 @@
 package com.salah.booknest.security;
 
+import io.jsonwebtoken.Claims;
 
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
@@ -46,9 +47,19 @@ public class JWTUtils {
         return false;
     }
 
+    private static final String PURPOSE_CLAIM = "purpose";
+    private static final String RESET_PURPOSE = "password-reset";
+
+    /** @return true for tokens issued by {@link #generatePasswordResetToken}; call only after validating the token */
+    public boolean isPasswordResetToken(String token) {
+        Claims claims = Jwts.parserBuilder().setSigningKey(jwtSecret).build().parseClaimsJws(token).getBody();
+        return RESET_PURPOSE.equals(claims.get(PURPOSE_CLAIM));
+    }
+
     public String generatePasswordResetToken(String username) {
         return Jwts.builder()
                 .setSubject(username)
+                .claim(PURPOSE_CLAIM, RESET_PURPOSE)
                 .setIssuedAt(new Date())
                 .setExpiration(new Date((new Date()).getTime() + 900000))
                 .signWith(SignatureAlgorithm.HS256, jwtSecret)

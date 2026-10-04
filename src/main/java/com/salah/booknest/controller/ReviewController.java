@@ -4,6 +4,7 @@ import com.salah.booknest.model.request.ReviewRequest;
 import com.salah.booknest.model.response.ReviewResponse;
 import com.salah.booknest.model.response.ReviewSummary;
 import com.salah.booknest.service.ReviewService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -24,7 +25,7 @@ public class ReviewController {
 
     @PostMapping("/books/{bookId}/reviews")
     public ResponseEntity<ReviewResponse> createReview(@PathVariable Long bookId,
-                                                       @RequestBody ReviewRequest request,
+                                                       @Valid @RequestBody ReviewRequest request,
                                                        Authentication authentication) {
         return ResponseEntity.status(HttpStatus.CREATED).body(reviewService.create(bookId, request, authentication));
     }

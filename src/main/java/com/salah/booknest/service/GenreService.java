@@ -2,15 +2,15 @@ package com.salah.booknest.service;
 
 import com.salah.booknest.exception.InformationExistException;
 import com.salah.booknest.exception.InformationNotFoundException;
+import com.salah.booknest.exception.InvalidStateException;
 import com.salah.booknest.model.Genre;
-import com.salah.booknest.model.User;
 import com.salah.booknest.repository.GenreRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Optional;
 
 @Service
 public class GenreService {
@@ -48,31 +48,34 @@ public class GenreService {
         return new ResponseEntity<> (genre, HttpStatus.CREATED);
     }
 
-    public ResponseEntity<?> updateGenre(Long genreId,Genre genreObject){
-        if (genreObject.getName() !=null) {
+    /** Edits only the fields that are sent. The name must stay unique, but a genre may keep its own. */
+    public ResponseEntity<?> updateGenre(Long genreId, Genre genreObject) {
+        Genre genre = genreRepository.findById(genreId)
+                .orElseThrow(() -> new InformationNotFoundException("Genre with ID " + genreId + " not found"));
+        if (genreObject.getName() != null) {
             genreRepository.findByName(genreObject.getName())
-                    .ifPresent(existingGenre -> {
+                    .filter(existing -> !existing.getId().equals(genreId))
+                    .ifPresent(existing -> {
                         throw new InformationExistException("Genre with name " + genreObject.getName() + " already exists");
                     });
+            genre.setName(genreObject.getName());
         }
-
-        Genre updatedGenre = genreRepository.getById(genreId);
-
-        if (genreObject.getName() != null){
-            updatedGenre.setName(genreObject.getName());
+        if (genreObject.getDescription() != null) {
+            genre.setDescription(genreObject.getDescription());
         }
-        if (genreObject.getDescription()!=null){
-            updatedGenre.setDescription(genreObject.getDescription());
-        }
-        genreRepository.save(updatedGenre);
-        return new ResponseEntity<> (updatedGenre, HttpStatus.OK);
-
+        return new ResponseEntity<>(genreRepository.save(genre), HttpStatus.OK);
     }
 
-    public ResponseEntity<?> deleteGenre(Long genreId){
+    /** A genre that books still use cannot be deleted; remove it from those books first. */
+    @Transactional
+    public ResponseEntity<?> deleteGenre(Long genreId) {
         Genre genre = genreRepository.findById(genreId)
-                .orElseThrow(() -> new InformationNotFoundException("genre with id " + genreId + " not found"));
-        genreRepository.deleteById(genreId);
-        return new ResponseEntity<> (HttpStatus.NO_CONTENT);
+                .orElseThrow(() -> new InformationNotFoundException("Genre with ID " + genreId + " not found"));
+        if (!genre.getBooks().isEmpty()) {
+            throw new InvalidStateException(
+                    "Genre \"" + genre.getName() + "\" is still used by " + genre.getBooks().size() + " book(s)");
+        }
+        genreRepository.delete(genre);
+        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
 }

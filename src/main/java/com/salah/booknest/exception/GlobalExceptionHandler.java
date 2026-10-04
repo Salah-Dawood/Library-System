@@ -3,16 +3,23 @@ package com.salah.booknest.exception;
 import com.salah.booknest.model.response.ApiError;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
 
 @Slf4j
 @RestControllerAdvice
@@ -61,6 +68,25 @@ public class GlobalExceptionHandler {
                 "Invalid value for parameter '" + ex.getName() + "'", req);
     }
 
+    @ExceptionHandler(DisabledException.class)
+    public ResponseEntity<ApiError> accountDeactivated(DisabledException ex, HttpServletRequest req) {
+        log.warn("Login attempt on a deactivated account");
+        return build(HttpStatus.FORBIDDEN, "ACCOUNT_DEACTIVATED", "This account has been deactivated", req);
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiError> dataConflict(DataIntegrityViolationException ex, HttpServletRequest req) {
+        log.warn("Data integrity violation on {}: {}", req.getRequestURI(), ex.getMostSpecificCause().getMessage());
+        return build(HttpStatus.CONFLICT, "DATA_CONFLICT",
+                "The request conflicts with existing data, for example the item is still in use", req);
+    }
+
+    /** A client closed its notification stream; there is nothing to report and no response can be written. */
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    public void clientDisconnected() {
+        log.debug("Client disconnected from a streaming response");
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> unexpected(Exception ex, HttpServletRequest req) {
         // Spring's own web exceptions (404 for unknown URLs, 405, ...) already know their status.
@@ -75,5 +101,16 @@ public class GlobalExceptionHandler {
     private ResponseEntity<ApiError> build(HttpStatus status, String error, String message, HttpServletRequest req) {
         ApiError body = new ApiError(LocalDateTime.now(), status.value(), error, message, req.getRequestURI());
         return ResponseEntity.status(status).body(body);
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<Map<String, String>> handleValidationExceptions(MethodArgumentNotValidException ex) {
+        Map<String, String> errors = new HashMap<>();
+        ex.getBindingResult().getAllErrors().forEach((error) -> {
+            String fieldName = ((FieldError) error).getField();
+            String errorMessage = error.getDefaultMessage();
+            errors.put(fieldName, errorMessage);
+        });
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errors);
     }
 }

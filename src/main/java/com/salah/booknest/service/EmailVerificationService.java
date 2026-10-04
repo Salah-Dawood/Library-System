@@ -1,18 +1,16 @@
 package com.salah.booknest.service;
 
 import com.salah.booknest.exception.InformationNotFoundException;
+import com.salah.booknest.exception.InvalidRequestException;
 import com.salah.booknest.model.User;
 import com.salah.booknest.repository.UserRepository;
 import com.salah.booknest.security.JWTUtils;
-import com.salah.booknest.security.JwtRequestFilter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 
-import java.security.SecureRandom;
-import java.util.Optional;
 import java.util.Random;
 
 @Service
@@ -75,44 +73,28 @@ public class EmailVerificationService {
         return 1000 + random.nextInt(9000);
     }
 
-    public String verifyEmail(String username,int code){
+    /** @throws InvalidRequestException when the code is wrong or no code was ever sent */
+    public String verifyEmail(String username, int code) {
         User user = userRepository.findUserByUsername(username)
                 .orElseThrow(() -> new InformationNotFoundException("Username " + username + " not found"));
-        if (user.getEmailVerificationCode() == code){
-            user.setIsVerified(true);
-            userRepository.save(user);
-            return "success";
-        } else {
-            return "no";
+        Integer stored = user.getEmailVerificationCode();
+        if (stored == null || stored != code) {
+            throw new InvalidRequestException("Incorrect verification code");
         }
+        user.setIsVerified(true);
+        userRepository.save(user);
+        return "success";
     }
 
-    public String sendResetEmail(String username){
+    public String sendResetEmail(String username) {
         User user = userRepository.findUserByUsername(username)
                 .orElseThrow(() -> new InformationNotFoundException("Username " + username + " not found"));
-        String password = generatePassword();
-        String email = user.getEmailAddress();
-        String subject = "Book Nest - Password Reset";
         String token = jwtUtils.generatePasswordResetToken(username);
-        String text = "Ignore this email if did not initiate the password reset process\n" +
-                "Click the folliwing link to reset you password:\n" +
-                root + "/reset.html?token=" + token + "\n\n" +
-                "api link: " + root + "/auth/users/passwordreset/";
-        sendEmail(email,subject,text);
+        // The link opens the React reset page; the "#" is part of the route, not a mistake.
+        String text = "Ignore this email if you did not initiate the password reset process.\n" +
+                "Click the following link to reset your password:\n" +
+                root + "/#/reset?token=" + token;
+        sendEmail(user.getEmailAddress(), "Book Nest - Password Reset", text);
         return "yooho";
     }
-
-    public String generatePassword(){
-        String pool = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-        SecureRandom random = new SecureRandom();
-        StringBuilder password = new StringBuilder();
-
-        for (int i = 0; i < 8; i++) {
-            int index = random.nextInt(pool.length());
-            password.append(pool.charAt(index));
-        }
-
-        return password.toString();
-    }
-
 }

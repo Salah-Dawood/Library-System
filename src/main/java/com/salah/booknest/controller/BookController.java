@@ -4,6 +4,7 @@ import com.salah.booknest.model.Book;
 import com.salah.booknest.model.request.CreateBookRequest;
 import com.salah.booknest.model.response.BookResponse;
 import com.salah.booknest.service.BookService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -37,7 +38,7 @@ public class BookController {
 
     @PostMapping("")
     @PreAuthorize("hasRole('librarian')")
-    public ResponseEntity<?> createBook(@RequestBody CreateBookRequest request){
+    public ResponseEntity<?> createBook(@Valid @RequestBody CreateBookRequest request){
         return bookService.createBook(request);
     }
 
