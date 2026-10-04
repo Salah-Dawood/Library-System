@@ -1,12 +1,11 @@
 package com.salah.booknest.controller;
 
-import com.salah.booknest.model.AuditLog;
 import com.salah.booknest.model.response.AuditLogResponse;
 import com.salah.booknest.service.AuditLogService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -23,7 +22,8 @@ public class AuditLogController {
 
     @GetMapping("")
     @PreAuthorize("hasRole('librarian')")
-    public List<AuditLogResponse> getAuditLogs(){
-        return auditLogService.getAuditLogs();
+    public List<AuditLogResponse> getAuditLogs(@RequestParam(required = false) String type,
+                                               @RequestParam(required = false) Long userId) {
+        return auditLogService.getAuditLogs(type, userId);
     }
 }
