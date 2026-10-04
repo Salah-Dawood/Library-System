@@ -32,11 +32,7 @@ public class JwtRequestFilter extends OncePerRequestFilter {
         return null;
     }
 
-    /**
-     * Server-Sent Events finish on an async dispatch of the same request. By default this filter
-     * skips async dispatches, which leaves the SecurityContext empty and makes Spring Security
-     * reject the stream. Running the filter again re-reads the same Authorization header.
-     */
+
     @Override
     protected boolean shouldNotFilterAsyncDispatch() {
         return false;

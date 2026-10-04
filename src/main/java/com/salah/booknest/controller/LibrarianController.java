@@ -41,6 +41,6 @@ public class LibrarianController {
     @PutMapping("/users/activate/{userId}")
     public User activateUser(@PathVariable Long userId){
         System.out.println("calling softDeleteUser()");
-        return librarianService.deactivateUser(userId);
+        return librarianService.activateUser(userId);
     }
 }

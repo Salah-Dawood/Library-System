@@ -3,9 +3,10 @@ package com.salah.booknest.model;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.annotations.UpdateTimestamp;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 
@@ -14,48 +15,29 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 @Entity
-@Table(name = "loans")
-@ToString(exclude = {"user", "book", "decidedBy"})
-public class Loan {
+@Table(name = "reviews", uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "book_id"}))
+@ToString(exclude = {"user", "book"})
+public class Review {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    //request instigator
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
     @JoinColumn(name = "book_id", nullable = false)
     private Book book;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private LoanStatus status = LoanStatus.REQUESTED;
+    @Column(nullable = false)
+    private Integer rating;
 
-    @Column(name = "requested_days", nullable = false)
-    private Integer requestedDays;
-
-    @Column(name = "loan_date")
-    private LocalDate loanDate;
-
-    @Column(name = "due_date")
-    private LocalDate dueDate;
-
-    @Column(name = "return_date")
-    private LocalDate returnDate;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "decided_by")
-    private User decidedBy;
-
-    @Column(name = "decided_at")
-    private LocalDateTime decidedAt;
-
-    @Column(name = "rejection_reason")
-    private String rejectionReason;
+    @Column(name = "comment_text", length = 1000)
+    private String comment;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

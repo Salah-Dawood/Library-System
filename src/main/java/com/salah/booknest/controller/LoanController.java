@@ -4,6 +4,7 @@ import com.salah.booknest.model.LoanStatus;
 import com.salah.booknest.model.request.LoanRequest;
 import com.salah.booknest.model.request.RejectLoanRequest;
 import com.salah.booknest.model.response.LoanResponse;
+import com.salah.booknest.model.response.ReturnStats;
 import com.salah.booknest.service.LoanService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -21,7 +22,6 @@ public class LoanController {
 
     private final LoanService loanService;
 
-    /** All loans, optionally filtered with {@code ?status=REQUESTED}. */
     @GetMapping
     @PreAuthorize("hasRole('librarian')")
     public List<LoanResponse> getLoans(@RequestParam(required = false) LoanStatus status) {
@@ -37,6 +37,17 @@ public class LoanController {
     @PreAuthorize("hasRole('librarian')")
     public List<LoanResponse> getByUserId(@PathVariable Long userId) {
         return loanService.getByUserId(userId);
+    }
+
+    @GetMapping("/my-stats")
+    public ReturnStats getMyStats(Authentication authentication) {
+        return loanService.getMyStats(authentication);
+    }
+
+    @GetMapping("/user/{userId}/stats")
+    @PreAuthorize("hasRole('librarian')")
+    public ReturnStats getUserStats(@PathVariable Long userId) {
+        return loanService.getStats(userId);
     }
 
     @PostMapping
@@ -65,7 +76,6 @@ public class LoanController {
     }
 
     @PutMapping("/{loanId}/return")
-    @PreAuthorize("hasRole('librarian')")
     public LoanResponse returnLoan(@PathVariable Long loanId, Authentication authentication) {
         return loanService.returnLoan(loanId, authentication);
     }

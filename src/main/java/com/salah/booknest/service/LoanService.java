@@ -8,10 +8,12 @@ import com.salah.booknest.model.Book;
 import com.salah.booknest.model.Inventory;
 import com.salah.booknest.model.Loan;
 import com.salah.booknest.model.LoanStatus;
+import com.salah.booknest.model.ReturnTiming;
 import com.salah.booknest.model.User;
 import com.salah.booknest.model.request.LoanRequest;
 import com.salah.booknest.model.response.LoanResponse;
 import com.salah.booknest.model.response.NotificationEvent;
+import com.salah.booknest.model.response.ReturnStats;
 import com.salah.booknest.repository.BookRepository;
 import com.salah.booknest.repository.InventoryRepository;
 import com.salah.booknest.repository.LoanRepository;
@@ -30,13 +32,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
-/**
- * Loan workflow: a member requests a book, a librarian approves or rejects it,
- * and a copy is only taken from the inventory on approval.
- * <p>
- * Methods that change a loan lock its row, and always lock the loan before the inventory,
- * so concurrent requests are serialized and cannot deadlock or take the same copy twice.
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -44,6 +39,8 @@ public class LoanService {
 
     private static final int MAX_LOAN_DAYS = 30;
     private static final int MAX_ACTIVE_LOANS = 5;
+    private static final int MIN_RETURNS_FOR_BADGE = 3;
+    private static final int RELIABLE_RATE_PERCENT = 90;
     private static final List<LoanStatus> ACTIVE_STATUSES = List.of(LoanStatus.REQUESTED, LoanStatus.APPROVED);
 
     private final LoanRepository loanRepository;
@@ -52,9 +49,7 @@ public class LoanService {
     private final InventoryRepository inventoryRepository;
     private final NotificationService notificationService;
 
-    // ---------- reads ----------
 
-    /** @param status optional filter; {@code null} returns every loan */
     @Transactional(readOnly = true)
     public List<LoanResponse> getLoans(LoanStatus status) {
         List<Loan> loans = status == null
@@ -74,9 +69,8 @@ public class LoanService {
                 .map(LoanResponse::from).toList();
     }
 
-    // ---------- workflow ----------
+    //workflow
 
-    /** A member asks to borrow a book. No copy is reserved until a librarian approves. */
     @Transactional
     public LoanResponse requestLoan(Authentication authentication, LoanRequest request) {
         if (request.getBookId() == null) {
@@ -110,7 +104,6 @@ public class LoanService {
         return LoanResponse.from(loan);
     }
 
-    /** Librarian approves: takes one copy from the inventory and sets the loan and due dates. */
     @Transactional
     public LoanResponse approve(Long loanId, Authentication librarian) {
         Loan loan = getLoanForUpdate(loanId);
@@ -134,7 +127,6 @@ public class LoanService {
         return LoanResponse.from(loan);
     }
 
-    /** Librarian rejects a pending request, optionally with a reason. */
     @Transactional
     public LoanResponse reject(Long loanId, String reason, Authentication librarian) {
         Loan loan = getLoanForUpdate(loanId);
@@ -150,10 +142,7 @@ public class LoanService {
         return LoanResponse.from(loan);
     }
 
-    /**
-     * A member cancels their own pending request; a librarian can cancel any pending or approved loan.
-     * Cancelling an approved loan gives its copy back.
-     */
+
     @Transactional
     public LoanResponse cancel(Long loanId, Authentication authentication) {
         Loan loan = getLoanForUpdate(loanId);
@@ -185,22 +174,60 @@ public class LoanService {
         return LoanResponse.from(loan);
     }
 
-    /** Librarian records that the book came back; its copy returns to the inventory. */
+
     @Transactional
-    public LoanResponse returnLoan(Long loanId, Authentication librarian) {
+    public LoanResponse returnLoan(Long loanId, Authentication authentication) {
         Loan loan = getLoanForUpdate(loanId);
+        boolean owner = loan.getUser().getUsername().equals(authentication.getName());
+        if (!owner && !Roles.isLibrarian(authentication)) {
+            throw new AccessDeniedException("You can only return your own loans");
+        }
         requireTransition(loan, LoanStatus.RETURNED);
 
         giveCopyBack(loan.getBook().getId());
         loan.setStatus(LoanStatus.RETURNED);
         loan.setReturnDate(LocalDate.now());
 
-        log.info("Loan {} returned, recorded by {}", loanId, librarian.getName());
-        notifyMember(loan, "LOAN_RETURNED", "\"" + loan.getBook().getTitle() + "\" was marked as returned");
+        String timing = describeTiming(ReturnTiming.daysLate(loan.getDueDate(), loan.getReturnDate()));
+        log.info("Loan {} returned by {} ({})", loanId, authentication.getName(), timing);
+
+        String title = loan.getBook().getTitle();
+        if (owner) {
+            notifyLibrarians(loan, "LOAN_RETURNED",
+                    loan.getUser().getUsername() + " returned \"" + title + "\" " + timing);
+        } else {
+            notifyMember(loan, "LOAN_RETURNED", "\"" + title + "\" was marked as returned " + timing);
+        }
         return LoanResponse.from(loan);
     }
 
-    // ---------- helpers ----------
+
+    @Transactional(readOnly = true)
+    public ReturnStats getMyStats(Authentication authentication) {
+        return getStats(getUserFromAuth(authentication).getId());
+    }
+
+    //count return status
+    @Transactional(readOnly = true)
+    public ReturnStats getStats(Long userId) {
+        int early = 0;
+        int onTime = 0;
+        int late = 0;
+        List<Loan> returned = loanRepository.findAllByUserIdAndStatus(userId, LoanStatus.RETURNED);
+        for (Loan loan : returned) {
+            switch (ReturnTiming.of(ReturnTiming.daysLate(loan.getDueDate(), loan.getReturnDate()))) {
+                case EARLY -> early++;
+                case ON_TIME -> onTime++;
+                case LATE -> late++;
+            }
+        }
+        int total = returned.size();
+        int rate = total == 0 ? 0 : Math.round(100f * (early + onTime) / total);
+        return new ReturnStats(total, early, onTime, late, rate,
+                total >= MIN_RETURNS_FOR_BADGE && rate >= RELIABLE_RATE_PERCENT);
+    }
+
+    // helper methods
 
     private User getUserFromAuth(Authentication authentication) {
         String username = authentication.getName();
@@ -216,6 +243,14 @@ public class LoanService {
     private Inventory getInventoryForUpdate(Long bookId) {
         return inventoryRepository.findByBookIdForUpdate(bookId)
                 .orElseThrow(() -> new InformationNotFoundException("Inventory for book " + bookId + " not found"));
+    }
+
+    private static String describeTiming(long daysLate) {
+        return switch (ReturnTiming.of(daysLate)) {
+            case EARLY -> Math.abs(daysLate) + " day(s) early";
+            case ON_TIME -> "on time";
+            case LATE -> daysLate + " day(s) late";
+        };
     }
 
     private void requireTransition(Loan loan, LoanStatus next) {
@@ -251,7 +286,6 @@ public class LoanService {
         return new NotificationEvent(type, message, loan.getId(), loan.getStatus(), LocalDateTime.now());
     }
 
-    /** Pushes events only after the database commit, so clients never hear about a change that was rolled back. */
     private void afterCommit(Runnable action) {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override

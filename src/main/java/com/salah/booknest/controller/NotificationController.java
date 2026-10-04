@@ -17,10 +17,6 @@ public class NotificationController {
 
     private final NotificationService notificationService;
 
-    /**
-     * Opens a Server-Sent Events stream for the logged-in user. Members receive events about their own loans;
-     * librarians also receive new-request and cancellation events.
-     */
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter stream(Authentication authentication) {
         return notificationService.subscribe(authentication.getName(), Roles.isLibrarian(authentication));

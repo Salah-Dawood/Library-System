@@ -49,12 +49,10 @@ public class UserService {
     //Find user services
 
     public User findUserById(Long userId){
-        System.out.println("Finding user by ID");
         return userRepository.findUserById(userId);
     }
 
     public User findUserByUsername(String username){
-        System.out.println("Finding user by username " + username);
         return userRepository.findUserByUsername(username)
                 .orElseThrow(() -> new InformationNotFoundException("Username " + username + " not found"));
     }
@@ -91,13 +89,21 @@ public class UserService {
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
         MyUserDetails principalDetails = (MyUserDetails) authentication.getPrincipal();
-        User dbUser = principalDetails.getUser();
+        User user = principalDetails.getUser();
 
 //        verify user is verified
-        if (!dbUser.getIsVerified()) {
+        if (!user.getIsVerified()) {
             java.util.Map<String, String> errorDetails = new java.util.HashMap<>();
             errorDetails.put("status", "USER_NOT_VERIFIED");
             errorDetails.put("message", "Please verify your email before logging in.");
+
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorDetails);
+        }
+
+        if (!user.getIsActive()) {
+            java.util.Map<String, String> errorDetails = new java.util.HashMap<>();
+            errorDetails.put("status", "USER_NOT_Active");
+            errorDetails.put("message", "Please refer to librarian for reactivation.");
 
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorDetails);
         }
@@ -107,11 +113,11 @@ public class UserService {
 
         // create user summary for front end
         LoginResponse.UserSummary summary = new LoginResponse.UserSummary(
-                dbUser.getId(),
-                dbUser.getUsername(),
-                dbUser.getEmailAddress(),
-                dbUser.getRole(),
-                dbUser.getIsActive()
+                user.getId(),
+                user.getUsername(),
+                user.getEmailAddress(),
+                user.getRole(),
+                user.getIsActive()
         );
 
         return ResponseEntity.ok(new LoginResponse(jwt, summary));

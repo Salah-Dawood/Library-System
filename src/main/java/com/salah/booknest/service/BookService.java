@@ -148,6 +148,7 @@ public class BookService {
         if (request.getAuthorId() != null) {
             Author author = authorRepository.findById(request.getAuthorId())
                     .orElseThrow(() -> new InformationNotFoundException("Author not found with ID: " + request.getAuthorId()));
+            book.setAuthor(author);
         }
 
         Set<Genre> genres = new HashSet<>();

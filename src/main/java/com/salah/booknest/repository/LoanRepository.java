@@ -20,11 +20,12 @@ public interface LoanRepository extends JpaRepository<Loan, Long> {
 
     List<Loan> findAllByUserIdOrderByCreatedAtDesc(Long userId);
 
+    List<Loan> findAllByUserIdAndStatus(Long userId, LoanStatus status);
+
     boolean existsByUserIdAndBookIdAndStatusIn(Long userId, Long bookId, Collection<LoanStatus> statuses);
 
     long countByUserIdAndStatusIn(Long userId, Collection<LoanStatus> statuses);
 
-    //preventin double approval
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select l from Loan l where l.id = :id")
     Optional<Loan> findByIdForUpdate(@Param("id") Long id);

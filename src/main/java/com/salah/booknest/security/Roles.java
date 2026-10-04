@@ -2,7 +2,6 @@ package com.salah.booknest.security;
 
 import org.springframework.security.core.Authentication;
 
-/** Small helper so role checks are written once. */
 public final class Roles {
 
     private static final String LIBRARIAN_AUTHORITY = "ROLE_librarian";

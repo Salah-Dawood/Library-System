@@ -2,15 +2,17 @@ package com.salah.booknest.model.response;
 
 import com.salah.booknest.model.Loan;
 import com.salah.booknest.model.LoanStatus;
+import com.salah.booknest.model.ReturnTiming;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-/** What the API returns for a loan. Flat on purpose: no nested User or Book entities. */
+
 public record LoanResponse(
         Long id,
         Long bookId,
         String bookTitle,
+        Long userId,
         String username,
         LoanStatus status,
         Integer requestedDays,
@@ -20,14 +22,30 @@ public record LoanResponse(
         String decidedBy,
         LocalDateTime decidedAt,
         String rejectionReason,
-        LocalDateTime createdAt) {
+        LocalDateTime createdAt,
+        ReturnTiming returnTiming,
+        Long daysLate,
+        boolean overdue) {
 
-    /** Must be called while the Hibernate session is open, because user and book are lazy. */
     public static LoanResponse from(Loan loan) {
+        LocalDate today = LocalDate.now();
+        boolean overdue = loan.getStatus() == LoanStatus.APPROVED
+                && loan.getDueDate() != null && today.isAfter(loan.getDueDate());
+
+        ReturnTiming timing = null;
+        Long daysLate = null;
+        if (loan.getStatus() == LoanStatus.RETURNED) {
+            daysLate = ReturnTiming.daysLate(loan.getDueDate(), loan.getReturnDate());
+            timing = ReturnTiming.of(daysLate);
+        } else if (overdue) {
+            daysLate = ReturnTiming.daysLate(loan.getDueDate(), today);
+        }
+
         return new LoanResponse(
                 loan.getId(),
                 loan.getBook().getId(),
                 loan.getBook().getTitle(),
+                loan.getUser().getId(),
                 loan.getUser().getUsername(),
                 loan.getStatus(),
                 loan.getRequestedDays(),
@@ -37,6 +55,9 @@ public record LoanResponse(
                 loan.getDecidedBy() == null ? null : loan.getDecidedBy().getUsername(),
                 loan.getDecidedAt(),
                 loan.getRejectionReason(),
-                loan.getCreatedAt());
+                loan.getCreatedAt(),
+                timing,
+                daysLate,
+                overdue);
     }
 }

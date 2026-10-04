@@ -14,21 +14,16 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-/**
- * Keeps the open Server-Sent Events connections and pushes events to them.
- * Connections live in memory only, so a user who is offline misses events and a restart drops everyone.
- */
+
 @Slf4j
 @Service
 public class NotificationService {
 
     private static final long TIMEOUT_MS = Duration.ofMinutes(30).toMillis();
 
-    /** A user can have several tabs open, so each username maps to a list of connections. */
     private final Map<String, List<SseEmitter>> emitters = new ConcurrentHashMap<>();
     private final Set<String> librarians = ConcurrentHashMap.newKeySet();
 
-    /** Opens a stream for the user and sends a first event so clients can confirm it works. */
     public SseEmitter subscribe(String username, boolean librarian) {
         SseEmitter emitter = new SseEmitter(TIMEOUT_MS);
         emitters.computeIfAbsent(username, key -> new CopyOnWriteArrayList<>()).add(emitter);

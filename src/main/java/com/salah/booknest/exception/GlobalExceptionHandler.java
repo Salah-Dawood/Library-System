@@ -14,7 +14,6 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 
 import java.time.LocalDateTime;
 
-/** Turns every exception into the {@link ApiError} format and keeps stack traces out of responses. */
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -45,7 +44,6 @@ public class GlobalExceptionHandler {
                 "You do not have permission to perform this action", req);
     }
 
-    /** Thrown by the login call when the username or password is wrong. */
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<ApiError> authenticationFailed(AuthenticationException ex, HttpServletRequest req) {
         log.warn("Failed authentication attempt on {}", req.getRequestURI());
