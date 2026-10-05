@@ -61,7 +61,6 @@ public class UserService {
 
 
     public User createUser(RegisterRequest request){
-        System.out.println("service calling createUser()");
         if(userRepository.existsByUsername(request.getUsername())){
             throw new InformationExistException("User with username " + request.getUsername() + " already exists");
         } else if (userRepository.existsByEmailAddress(request.getEmailAddress())){
@@ -86,7 +85,6 @@ public class UserService {
     }
 
     public ResponseEntity<?> loginUser(LoginRequest loginRequest) {
-        System.out.println("Processing login for: " + loginRequest.getUsername());
 
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(

@@ -22,27 +22,23 @@ public class GenreController {
 
     @GetMapping("")
     public List<Genre> getGenres(){
-        System.out.println("calling getGenres()");
         return genreService.getGenres();
     }
 
     @GetMapping("{name}")
     public Genre getGenre(@PathVariable String name){
-        System.out.println("calling getGenre()");
         return genreService.getGenre(name);
     }
 
     @PostMapping("")
     @PreAuthorize("hasRole('librarian')")
     public ResponseEntity<?> createGenre(@RequestBody Genre genreObject){
-        System.out.println("calling createGenre()");
         return genreService.createGenre(genreObject);
     }
 
     @DeleteMapping("/{genreId}")
     @PreAuthorize("hasRole('librarian')")
     public ResponseEntity<?> deleteGenre(@PathVariable Long genreId){
-        System.out.println("calling deleteGenre()");
         return genreService.deleteGenre(genreId);
     }
 

@@ -26,14 +26,12 @@ public class EmailVerificationController {
     public String sendVerificationCode(@PathVariable String username){
         User user = userRepository.findUserByUsername(username)
                 .orElseThrow(() -> new InformationNotFoundException("Username " + username + " not found"));
-        System.out.println("calling sendVerificationCode() to " + user.getEmailAddress());
         emailVerificationService.sendVerificationCode(user);
         return "SENT";
     }
 
     @PutMapping("/verify/{username}")
     public String vertifyEmail(@PathVariable String username, @RequestParam int code){
-        System.out.println();
         return emailVerificationService.verifyEmail(username,code);
     }
 
