@@ -20,6 +20,7 @@ public class SecurityConfiguration {
 
     private final MyUserDetailsService myUserDetailsService;
     private final JwtRequestFilter jwtRequestFilter;
+    private final AuthRateLimitFilter authRateLimitFilter;
 
     @Bean
     public PasswordEncoder passwordEncoder(){
@@ -33,16 +34,18 @@ public class SecurityConfiguration {
                 .authorizeHttpRequests(auth -> auth.requestMatchers(
                                 "/", "/index.html", "/favicon.ico", "/*.js", "/*.css","/*.html","/profile/**",
                                 "/static/**", "/css/**", "/js/**", "/images/**",
-                                "/auth/users",
-                                "/auth/users/login",
-                                "/auth/users/register",
                                 "/auth/**",
                                 "/hello",
                                 "/error"
                         ).permitAll()
                         .anyRequest().authenticated());
 
+        http.addFilterBefore(
+                authRateLimitFilter,
+                UsernamePasswordAuthenticationFilter.class
+        );
         http.addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
+
         return http.build();
     }
 
