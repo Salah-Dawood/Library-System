@@ -61,7 +61,6 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
                         "message": "Too many requests. Please try again later."
                     }
                     """);
-
             return;
         }
 

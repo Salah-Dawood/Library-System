@@ -10,15 +10,14 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.core.AuthenticationException;
-import org.springframework.validation.FieldError;
-import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.validation.BindException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 @Slf4j
@@ -98,20 +97,21 @@ public class GlobalExceptionHandler {
     }
 
     private ResponseEntity<ApiError> build(HttpStatus status, String error, String message, HttpServletRequest req) {
-        ApiError body = new ApiError(LocalDateTime.now(), status.value(), error, message, req.getRequestURI());
+        ApiError body = new ApiError(LocalDateTime.now(), status.value(), error, message, req.getRequestURI(), null);
         return ResponseEntity.status(status).body(body);
     }
 
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<Map<String, String>> handleValidationExceptions(MethodArgumentNotValidException ex) {
-        Map<String, String> errors = new HashMap<>();
+    /** Failed @Valid checks, for JSON bodies and form data: one message per invalid field. */
+    @ExceptionHandler(BindException.class)
+    public ResponseEntity<ApiError> invalidFields(BindException ex, HttpServletRequest req) {
+        Map<String, String> fieldErrors = new LinkedHashMap<>();
+        ex.getBindingResult().getFieldErrors().forEach(error ->
+                fieldErrors.merge(error.getField(), String.valueOf(error.getDefaultMessage()), (a, b) -> a + "; " + b));
+        ex.getBindingResult().getGlobalErrors().forEach(error ->
+                fieldErrors.put(error.getObjectName(), String.valueOf(error.getDefaultMessage())));
 
-        ex.getBindingResult().getFieldErrors().forEach((error) -> {
-            String fieldName = error.getField();
-            String errorMessage = error.getDefaultMessage();
-            errors.put(fieldName, errorMessage);
-        });
-
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errors);
+        ApiError body = new ApiError(LocalDateTime.now(), HttpStatus.BAD_REQUEST.value(), "VALIDATION_FAILED",
+                "Validation failed for " + fieldErrors.size() + " field(s)", req.getRequestURI(), fieldErrors);
+        return ResponseEntity.badRequest().body(body);
     }
 }
