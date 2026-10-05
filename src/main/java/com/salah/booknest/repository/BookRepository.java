@@ -1,6 +1,9 @@
 package com.salah.booknest.repository;
 
 import com.salah.booknest.model.Book;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
@@ -9,4 +12,5 @@ public interface BookRepository extends JpaRepository<Book,Long> {
     Optional<Book> findByTitle(String title);
     Optional<Book> findByIsbn(String isbn);
 
+    Page<Book> findAll(Specification<Book> spec, Pageable pageable);
 }

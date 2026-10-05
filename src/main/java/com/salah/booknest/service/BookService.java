@@ -14,6 +14,11 @@ import com.salah.booknest.repository.BookRepository;
 import com.salah.booknest.repository.GenreRepository;
 import com.salah.booknest.repository.InventoryRepository;
 import com.salah.booknest.repository.ReviewRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -74,13 +79,34 @@ public class BookService {
 
 
     //return all book
-    public List<BookResponse> getBooks(){
-        List<Book> books = bookRepository.findAll();
-        List<BookResponse> booksResponses = new ArrayList<>();
-        for (Book book : books) {
-            booksResponses.add(bookResponser(book));
+    public Page<Book> getBooks(String title, String genre, int page, int size, String sortBy, String sortDir) {
+
+        // 1. SET UP PAGINATION AND SORTING
+        // Chooses ASC or DESC sorting order
+        Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ?
+                Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
+
+        // Creates the Pageable controller config (Spring uses 0-indexed pages)
+        Pageable pageable = PageRequest.of(page, size, sort);
+
+        // 2. SET UP DYNAMIC FILTERING (JPA Specification)
+        Specification<Book> spec = null;
+
+        if (title != null && !title.trim().isEmpty()) {
+            Specification<Book> titleSpec = (root, query, cb) ->
+                    cb.like(cb.lower(root.get("title")), "%" + title.toLowerCase() + "%");
+
+            // Combine cleanly using a quick null check conditions loop
+            spec = (spec == null) ? Specification.where(titleSpec) : spec.and(titleSpec);
         }
-        return booksResponses;
+
+        if (genre != null && !genre.trim().isEmpty()) {
+            Specification<Book> genreSpec = (root, query, cb) -> cb.equal(root.get("genre"), genre);
+            spec = (spec == null) ? Specification.where(genreSpec) : spec.and(genreSpec);
+        }
+
+        // 3. EXECUTE COMBINED DB QUERY
+        return bookRepository.findAll(spec, pageable);
     }
 
     //return Book by title
