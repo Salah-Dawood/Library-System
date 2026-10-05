@@ -5,6 +5,7 @@ import com.salah.booknest.model.UserProfile;
 import com.salah.booknest.model.request.ChangePasswordRequest;
 import com.salah.booknest.model.request.UpdateProfileRequest;
 import com.salah.booknest.service.MemberService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -26,7 +27,7 @@ public class MemberController {
 
     @PutMapping("/update/profile")
     public ResponseEntity<String> updateProfile(@AuthenticationPrincipal UserDetails userDetails,
-                                                 @ModelAttribute UpdateProfileRequest request){
+                                                 @Valid @ModelAttribute UpdateProfileRequest request){
         String result = memberService.updateProfile(userDetails.getUsername(), request);
         return ResponseEntity.ok(result);
     }
