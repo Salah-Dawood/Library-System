@@ -11,10 +11,11 @@ import java.util.List;
 @Getter
 public class CreateBookRequest {
 
-    @NotBlank(message = "Title cannot be blank")
+    @NotEmpty(message = "Title cannot be empty")
     private String title;
 
-    @NotBlank(message = "ISBN can not be blank")
+    @NotEmpty(message = "ISBN can not be empty")
+
     private String isbn;
 
     private Integer publishedYear;

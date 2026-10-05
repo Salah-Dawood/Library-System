@@ -2,8 +2,11 @@ package com.salah.booknest.controller;
 
 import com.salah.booknest.exception.InformationNotFoundException;
 import com.salah.booknest.model.User;
+import com.salah.booknest.model.request.UsernameRequest;
 import com.salah.booknest.repository.UserRepository;
 import com.salah.booknest.service.EmailVerificationService;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Past;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -34,9 +37,9 @@ public class EmailVerificationController {
         return emailVerificationService.verifyEmail(username,code);
     }
 
-    @PutMapping("/forgotpassword/{username}")
-    public String sendResetEmail(@PathVariable String username){
-        emailVerificationService.sendResetEmail(username);
+    @PutMapping("/forgotpassword")
+    public String sendResetEmail(@Valid @RequestBody UsernameRequest request){
+        emailVerificationService.sendResetEmail(request);
         return "reset should be sent by now";
     }
 }

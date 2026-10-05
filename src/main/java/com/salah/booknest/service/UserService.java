@@ -3,6 +3,7 @@ package com.salah.booknest.service;
 import com.salah.booknest.exception.InformationExistException;
 import com.salah.booknest.exception.InformationNotFoundException;
 import com.salah.booknest.model.User;
+import com.salah.booknest.model.UserProfile;
 import com.salah.booknest.model.request.LoginRequest;
 import com.salah.booknest.model.request.RegisterRequest;
 import com.salah.booknest.model.response.LoginResponse;
@@ -69,8 +70,14 @@ public class UserService {
             User user = new User();
             user.setUsername(request.getUsername());
             user.setEmailAddress(request.getEmailAddress());
-            user.setUserProfile(request.getUserProfile());
             user.setPassword(passwordEncoder.encode(request.getPassword()));
+
+            UserProfile profile = new UserProfile();
+            profile.setUser(user);
+            profile.setFirstName(request.getFirstName());
+            profile.setLastName(request.getLastName());
+            profile.setAge(request.getAge());
+            profile.setBio(request.getBio());
 
             User saved = userRepository.save(user);
             auditLogService.logAs("USER", saved.getId(), "REGISTERED", saved.getId());

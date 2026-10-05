@@ -3,6 +3,7 @@ package com.salah.booknest.service;
 import com.salah.booknest.exception.InformationNotFoundException;
 import com.salah.booknest.exception.InvalidRequestException;
 import com.salah.booknest.model.User;
+import com.salah.booknest.model.request.UsernameRequest;
 import com.salah.booknest.repository.UserRepository;
 import com.salah.booknest.security.JWTUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -85,11 +86,10 @@ public class EmailVerificationService {
         return "success";
     }
 
-    public String sendResetEmail(String username) {
-        User user = userRepository.findUserByUsername(username)
-                .orElseThrow(() -> new InformationNotFoundException("Username " + username + " not found"));
-        String token = jwtUtils.generatePasswordResetToken(username);
-        // The link opens the React reset page; the "#" is part of the route, not a mistake.
+    public String sendResetEmail(UsernameRequest request) {
+        User user = userRepository.findUserByUsername(request.getUsername())
+                .orElseThrow(() -> new InformationNotFoundException("Username " + request.getUsername() + " not found"));
+        String token = jwtUtils.generatePasswordResetToken(request.getUsername());
         String text = "Ignore this email if you did not initiate the password reset process.\n" +
                 "Click the following link to reset your password:\n" +
                 root + "/#/reset?token=" + token;
