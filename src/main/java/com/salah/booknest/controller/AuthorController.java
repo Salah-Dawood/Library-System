@@ -76,8 +76,8 @@ public class AuthorController {
     @PutMapping("/{authorId}")
     @PreAuthorize("hasRole('librarian')")
     public ResponseEntity<?> updateAuthor(@Parameter(description = "Id of the author") @PathVariable Long authorId,
-                                          @RequestBody Author authorObject){
-        return authorService.updateAuthor(authorId,authorObject);
+                                          @RequestBody AuthorRequest request){
+        return authorService.updateAuthor(authorId,request);
     }
 
     @Operation(summary = "Delete an author", description = "Also deletes all of the author's books and their loans and reviews. Librarian only.")
