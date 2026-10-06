@@ -3,6 +3,7 @@ package com.salah.booknest.service;
 import com.salah.booknest.exception.InformationExistException;
 import com.salah.booknest.exception.InformationNotFoundException;
 import com.salah.booknest.model.Author;
+import com.salah.booknest.model.request.AuthorRequest;
 import com.salah.booknest.repository.AuthorRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -33,30 +34,35 @@ public class AuthorService {
                 .orElseThrow(() -> new InformationNotFoundException("Author with name " + name + " is does not exist"));
     }
 
-    public ResponseEntity<?> createAuthor(Author authorObject){
-        if (authorRepository.existsByName(authorObject.getName())){
-            throw new InformationExistException("Author with name " + authorObject.getName() + " already exists");
+    public ResponseEntity<?> createAuthor(AuthorRequest request){
+        if (authorRepository.existsByName(request.getName())){
+            throw new InformationExistException("Author with name " + request.getName() + " already exists");
         }
-        authorRepository.save(authorObject);
-        return new ResponseEntity<>(authorObject, HttpStatus.CREATED);
+        Author newAuthor = new Author();
+        newAuthor.setName(request.getName());
+        newAuthor.setBirthYear(request.getBirthYear());
+        newAuthor.setNationality(request.getNationality());
+
+        authorRepository.save(newAuthor);
+        return new ResponseEntity<>(request, HttpStatus.CREATED);
     }
 
-    public ResponseEntity<?> updateAuthor(Long authorId, Author authorObject) {
+    public ResponseEntity<?> updateAuthor(Long authorId, AuthorRequest request) {
         Author author = authorRepository.findById(authorId)
                 .orElseThrow(() -> new InformationNotFoundException("Author with ID " + authorId + " does not exist"));
-        if (authorObject.getName() != null) {
-            authorRepository.findByName(authorObject.getName())
+        if (request.getName() != null) {
+            authorRepository.findByName(request.getName())
                     .filter(existing -> !existing.getId().equals(authorId))
                     .ifPresent(existing -> {
-                        throw new InformationExistException("Author with name " + authorObject.getName() + " already exists");
+                        throw new InformationExistException("Author with name " + request.getName() + " already exists");
                     });
-            author.setName(authorObject.getName());
+            author.setName(request.getName());
         }
-        if (authorObject.getBirthYear() != null) {
-            author.setBirthYear(authorObject.getBirthYear());
+        if (request.getBirthYear() != null) {
+            author.setBirthYear(request.getBirthYear());
         }
-        if (authorObject.getNationality() != null) {
-            author.setNationality(authorObject.getNationality());
+        if (request.getNationality() != null) {
+            author.setNationality(request.getNationality());
         }
         return new ResponseEntity<>(authorRepository.save(author), HttpStatus.OK);
     }

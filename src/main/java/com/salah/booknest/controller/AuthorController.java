@@ -1,5 +1,6 @@
 package com.salah.booknest.controller;
 
+import com.salah.booknest.model.request.AuthorRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -10,6 +11,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.salah.booknest.model.Author;
 import com.salah.booknest.service.AuthorService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -59,8 +61,8 @@ public class AuthorController {
             examples = @ExampleObject(value = "{\"name\":\"Frank Herbert\",\"birthYear\":1920,\"nationality\":\"American\"}")))
     @PostMapping("")
     @PreAuthorize("hasRole('librarian')")
-    public ResponseEntity<?> createAuthor(@RequestBody Author authorObject){
-        return authorService.createAuthor(authorObject);
+    public ResponseEntity<?> createAuthor(@Valid @RequestBody AuthorRequest request){
+        return authorService.createAuthor(request);
     }
 
     @Operation(summary = "Edit an author", description = "Only the fields you send are changed. An author can keep their own name. Librarian only.")
