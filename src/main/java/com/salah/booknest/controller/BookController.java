@@ -1,6 +1,5 @@
 package com.salah.booknest.controller;
 
-import com.salah.booknest.model.Book;
 import com.salah.booknest.model.request.CreateBookRequest;
 import com.salah.booknest.model.response.BookResponse;
 import com.salah.booknest.service.BookService;
@@ -9,8 +8,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/books")
@@ -23,7 +20,7 @@ public class BookController {
     }
 
     @GetMapping("")
-    public ResponseEntity<Page<Book>> getAllBooks(
+    public ResponseEntity<Page<BookResponse>> getAllBooks(
             // Optional Filtering Parameters
             @RequestParam(required = false) String title,
             @RequestParam(required = false) String genre,
@@ -36,7 +33,7 @@ public class BookController {
             @RequestParam(defaultValue = "id") String sortBy,
             @RequestParam(defaultValue = "asc") String sortDir
     ) {
-        Page<Book> booksPage = bookService.getBooks(title, genre, page, size, sortBy, sortDir);
+        Page<BookResponse> booksPage = bookService.getBooks(title, genre, page, size, sortBy, sortDir);
         return ResponseEntity.ok(booksPage);
     }
 

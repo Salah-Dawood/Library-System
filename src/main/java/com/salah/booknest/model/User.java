@@ -24,13 +24,13 @@ public class User {
     @Column
     private Long id;
 
-    @Column
+    @Column(nullable = false,unique = true)
     private String username;
 
-    @Column
+    @Column(nullable = false,unique = true)
     private String emailAddress;
 
-    @Column
+    @Column(nullable = false)
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String password;
 

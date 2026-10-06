@@ -39,14 +39,14 @@ public class Book {
     @Column(nullable = false)
     private String isbn;
 
-    @Column
+    @Column(nullable = false)
     private Integer publishedYear;
 
-    @Column
+    @Column(nullable = false)
     @CreationTimestamp
     private LocalDateTime createdAt;
 
-    @Column
+    @Column(nullable = false)
     @UpdateTimestamp
     private LocalDateTime updatedAt;
 

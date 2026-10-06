@@ -36,8 +36,4 @@ public class UserController {
             @RequestBody ChangePasswordRequest changePasswordRequest) {
         return userService.executePasswordReset(token, changePasswordRequest.getNewPassword());
     }
-
-
-
-
 }

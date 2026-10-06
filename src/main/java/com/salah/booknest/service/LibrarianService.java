@@ -4,6 +4,7 @@ import com.salah.booknest.exception.InformationNotFoundException;
 import com.salah.booknest.exception.InvalidStateException;
 import com.salah.booknest.model.User;
 import com.salah.booknest.model.response.LoginResponse;
+import com.salah.booknest.model.response.UserDetailResponse;
 import com.salah.booknest.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -18,6 +19,14 @@ public class LibrarianService {
 
     private final UserRepository userRepository;
     private final AuditLogService auditLogService;
+
+    /** One user with their profile, for the librarian's user page. */
+    @Transactional(readOnly = true)
+    public UserDetailResponse getUserDetail(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new InformationNotFoundException("User with id " + userId + " not found"));
+        return UserDetailResponse.from(user);
+    }
 
     public List<LoginResponse.UserSummary> getUsers() {
         return userRepository.findAll().stream().map(this::toSummary).toList();

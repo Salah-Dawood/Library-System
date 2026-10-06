@@ -23,16 +23,16 @@ public class UserProfile {
     @Column
     private Long id;
 
-    @Column
+    @Column(nullable = false)
     private String firstName;
 
-    @Column
+    @Column(nullable = false)
     private String lastName;
 
     @Column
     private String bio;
 
-    @Column
+    @Column(nullable = false)
     private int age;
 
     @Column

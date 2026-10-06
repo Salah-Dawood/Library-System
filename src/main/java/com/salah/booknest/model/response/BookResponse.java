@@ -16,6 +16,8 @@ public class BookResponse {
     private int availableCopies;
     private Double averageRating;
     private int reviewCount;
+    private Long authorId;
     private String authorName;
     private List<String> genreNames;
+    private List<Long> genreIds;
 }

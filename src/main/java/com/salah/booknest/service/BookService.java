@@ -14,6 +14,7 @@ import com.salah.booknest.repository.BookRepository;
 import com.salah.booknest.repository.GenreRepository;
 import com.salah.booknest.repository.InventoryRepository;
 import com.salah.booknest.repository.ReviewRepository;
+import jakarta.persistence.criteria.Join;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -79,34 +80,36 @@ public class BookService {
 
 
     //return all book
-    public Page<Book> getBooks(String title, String genre, int page, int size, String sortBy, String sortDir) {
+    private static final Set<String> SORTABLE_FIELDS = Set.of("id", "title", "publishedYear", "createdAt");
+    private static final int MAX_PAGE_SIZE = 100;
 
-        // 1. SET UP PAGINATION AND SORTING
-        // Chooses ASC or DESC sorting order
-        Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ?
-                Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
-
-        // Creates the Pageable controller config (Spring uses 0-indexed pages)
-        Pageable pageable = PageRequest.of(page, size, sort);
-
-        // 2. SET UP DYNAMIC FILTERING (JPA Specification)
-        Specification<Book> spec = null;
-
-        if (title != null && !title.trim().isEmpty()) {
-            Specification<Book> titleSpec = (root, query, cb) ->
-                    cb.like(cb.lower(root.get("title")), "%" + title.toLowerCase() + "%");
-
-            // Combine cleanly using a quick null check conditions loop
-            spec = (spec == null) ? Specification.where(titleSpec) : spec.and(titleSpec);
+    /**
+     * One page of books. Optional filters: title (contains, ignoring case) and genre (exact name, ignoring case).
+     * Page size is capped and only whitelisted fields can be sorted on, so bad input gives a 400 instead of a 500.
+     */
+    @Transactional(readOnly = true)
+    public Page<BookResponse> getBooks(String title, String genre, int page, int size, String sortBy, String sortDir) {
+        if (!SORTABLE_FIELDS.contains(sortBy)) {
+            throw new InvalidRequestException("Cannot sort by '" + sortBy + "'. Use one of " + SORTABLE_FIELDS);
         }
+        Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name())
+                ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
+        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), MAX_PAGE_SIZE), sort);
 
-        if (genre != null && !genre.trim().isEmpty()) {
-            Specification<Book> genreSpec = (root, query, cb) -> cb.equal(root.get("genre"), genre);
-            spec = (spec == null) ? Specification.where(genreSpec) : spec.and(genreSpec);
+        Specification<Book> spec = (root, query, cb) -> cb.conjunction();
+        if (title != null && !title.isBlank()) {
+            spec = spec.and((root, query, cb) ->
+                    cb.like(cb.lower(root.get("title")), "%" + title.trim().toLowerCase() + "%"));
         }
-
-        // 3. EXECUTE COMBINED DB QUERY
-        return bookRepository.findAll(spec, pageable);
+        if (genre != null && !genre.isBlank()) {
+            // Books and genres are many-to-many, so join and de-duplicate the books.
+            spec = spec.and((root, query, cb) -> {
+                query.distinct(true);
+                Join<Book, Genre> genres = root.join("genres");
+                return cb.equal(cb.lower(genres.get("name")), genre.trim().toLowerCase());
+            });
+        }
+        return bookRepository.findAll(spec, pageable).map(this::bookResponser);
     }
 
     //return Book by title
@@ -172,6 +175,7 @@ public class BookService {
         return new ResponseEntity<>(bookResponser(savedBook), HttpStatus.CREATED);
     }
 
+    /** Edits only the fields that are sent. The ISBN must stay unique, but a book may keep its own. */
     @Transactional
     public ResponseEntity<?> updateBook(Long bookId, CreateBookRequest request) {
         Book book = bookRepository.findById(bookId)
@@ -222,7 +226,10 @@ public class BookService {
         return ResponseEntity.noContent().build();
     }
 
-
+    /**
+     * Changes the stock while keeping the number of copies currently on loan constant,
+     * so available copies can never exceed the total. The row is locked against concurrent approvals.
+     */
     private void updateTotalCopies(Long bookId, int newTotal) {
         Inventory inventory = inventoryRepository.findByBookIdForUpdate(bookId)
                 .orElseThrow(() -> new InformationNotFoundException("Inventory for book " + bookId + " not found"));

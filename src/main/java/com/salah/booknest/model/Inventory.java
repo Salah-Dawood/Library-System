@@ -21,6 +21,9 @@ public class Inventory {
     @JoinColumn(name = "book_id") // References the books table
     private Book book;
 
+    @Column(nullable = false)
     private Integer totalCopies;
+
+    @Column(nullable = false)
     private Integer availableCopies;
 }

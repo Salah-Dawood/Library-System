@@ -1,6 +1,7 @@
 package com.salah.booknest.controller;
 
 import com.salah.booknest.model.response.LoginResponse;
+import com.salah.booknest.model.response.UserDetailResponse;
 import com.salah.booknest.service.LibrarianService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +18,11 @@ import java.util.List;
 public class LibrarianController {
 
     private final LibrarianService librarianService;
+
+    @GetMapping("/users/{userId}")
+    public UserDetailResponse getUser(@PathVariable Long userId) {
+        return librarianService.getUserDetail(userId);
+    }
 
     @GetMapping("/users")
     public List<LoginResponse.UserSummary> getUsers() {
