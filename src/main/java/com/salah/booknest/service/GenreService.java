@@ -4,6 +4,7 @@ import com.salah.booknest.exception.InformationExistException;
 import com.salah.booknest.exception.InformationNotFoundException;
 import com.salah.booknest.exception.InvalidStateException;
 import com.salah.booknest.model.Genre;
+import com.salah.booknest.model.request.GenreRequest;
 import com.salah.booknest.repository.GenreRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -35,32 +36,32 @@ public class GenreService {
     }
 
     //create genre
-    public ResponseEntity<?> createGenre(Genre genreObject){
-        genreRepository.findByName(genreObject.getName())
+    public ResponseEntity<?> createGenre(GenreRequest request){
+        genreRepository.findByName(request.getName())
                 .ifPresent(existingGenre -> {
-                    throw new InformationExistException("Genre with name " + genreObject.getName() + " already exists");
+                    throw new InformationExistException("Genre with name " + request.getName() + " already exists");
                 });
         Genre genre = new Genre();
 
-        genre.setName(genreObject.getName());
-        genre.setDescription(genreObject.getDescription());
+        genre.setName(request.getName());
+        genre.setDescription(request.getDescription());
         genreRepository.save(genre);
         return new ResponseEntity<> (genre, HttpStatus.CREATED);
     }
 
-    public ResponseEntity<?> updateGenre(Long genreId, Genre genreObject) {
+    public ResponseEntity<?> updateGenre(Long genreId, GenreRequest request) {
         Genre genre = genreRepository.findById(genreId)
                 .orElseThrow(() -> new InformationNotFoundException("Genre with ID " + genreId + " not found"));
-        if (genreObject.getName() != null) {
-            genreRepository.findByName(genreObject.getName())
+        if (request.getName() != null) {
+            genreRepository.findByName(request.getName())
                     .filter(existing -> !existing.getId().equals(genreId))
                     .ifPresent(existing -> {
-                        throw new InformationExistException("Genre with name " + genreObject.getName() + " already exists");
+                        throw new InformationExistException("Genre with name " + request.getName() + " already exists");
                     });
-            genre.setName(genreObject.getName());
+            genre.setName(request.getName());
         }
-        if (genreObject.getDescription() != null) {
-            genre.setDescription(genreObject.getDescription());
+        if (request.getDescription() != null) {
+            genre.setDescription(request.getDescription());
         }
         return new ResponseEntity<>(genreRepository.save(genre), HttpStatus.OK);
     }

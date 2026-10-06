@@ -1,5 +1,6 @@
 package com.salah.booknest.controller;
 
+import com.salah.booknest.model.request.GenreRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -10,6 +11,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.salah.booknest.model.Genre;
 import com.salah.booknest.service.GenreService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -51,8 +53,8 @@ public class GenreController {
             examples = @ExampleObject(value = "{\"name\":\"Science Fiction\",\"description\":\"Speculative fiction about science and the future\"}")))
     @PostMapping("")
     @PreAuthorize("hasRole('librarian')")
-    public ResponseEntity<?> createGenre(@RequestBody Genre genreObject){
-        return genreService.createGenre(genreObject);
+    public ResponseEntity<?> createGenre(@Valid @RequestBody GenreRequest request){
+        return genreService.createGenre(request);
     }
 
     @Operation(summary = "Delete a genre", description = "Refused while any book still uses the genre. Librarian only.")
@@ -78,7 +80,7 @@ public class GenreController {
     @PutMapping("/{genreId}")
     @PreAuthorize("hasRole('librarian')")
     public ResponseEntity<?> updateGenre(@Parameter(description = "Id of the genre") @PathVariable Long genreId,
-                                         @RequestBody Genre genreObject){
-        return genreService.updateGenre(genreId,genreObject);
+                                         @Valid @RequestBody GenreRequest request){
+        return genreService.updateGenre(genreId,request);
     }
 }

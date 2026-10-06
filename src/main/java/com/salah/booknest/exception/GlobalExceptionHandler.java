@@ -101,7 +101,6 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(status).body(body);
     }
 
-    /** Failed @Valid checks, for JSON bodies and form data: one message per invalid field. */
     @ExceptionHandler(BindException.class)
     public ResponseEntity<ApiError> invalidFields(BindException ex, HttpServletRequest req) {
         Map<String, String> fieldErrors = new LinkedHashMap<>();
