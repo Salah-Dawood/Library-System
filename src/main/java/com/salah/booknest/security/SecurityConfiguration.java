@@ -36,7 +36,8 @@ public class SecurityConfiguration {
                                 "/static/**", "/css/**", "/js/**", "/images/**",
                                 "/auth/**",
                                 "/hello",
-                                "/error"
+                                "/error",
+                                "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**"
                         ).permitAll()
                         .anyRequest().authenticated());
 
