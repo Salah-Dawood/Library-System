@@ -25,7 +25,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AuditLogService {
 
-    private static final Logger AUDIT = LoggerFactory.getLogger("AUDIT");
+    private static final Logger AUDIT = LoggerFactory.getLogger("AUDIT LOG");
 
     private final List<AuditChannel> channels;
     private final AuditLogRepository auditLogRepository;

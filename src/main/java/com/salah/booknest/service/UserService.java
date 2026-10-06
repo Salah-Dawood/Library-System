@@ -78,6 +78,7 @@ public class UserService {
             profile.setAge(request.getAge());
             profile.setBio(request.getBio());
 
+            user.setUserProfile(profile);
             User saved = userRepository.save(user);
             auditLogService.logAs("USER", saved.getId(), "REGISTERED", saved.getId());
             return saved;

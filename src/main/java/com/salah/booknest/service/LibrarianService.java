@@ -49,13 +49,6 @@ public class LibrarianService {
         return toSummary(saved);
     }
 
-    @Transactional
-    public void deleteUser(Long userId, String librarian) {
-        User user = getOtherUser(userId, librarian);
-        // Audited first so the entry can still name the user it is about.
-        auditLogService.log("USER", "DELETED", userId);
-        userRepository.delete(user);
-    }
 
     private User getOtherUser(Long userId, String librarian) {
         User user = userRepository.findById(userId)

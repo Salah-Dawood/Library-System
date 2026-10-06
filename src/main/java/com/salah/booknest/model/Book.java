@@ -30,7 +30,7 @@ public class Book {
     private String title;
 
     @ManyToOne(optional = false)
-    @JoinColumn(name = "author_id",unique = true)
+    @JoinColumn(name = "author_id")
     @JsonIgnoreProperties("books")
     private Author author;
 

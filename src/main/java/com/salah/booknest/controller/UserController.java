@@ -67,7 +67,7 @@ public class UserController {
     @PutMapping("/passwordreset/{token}")
     public ResponseEntity<String> executePasswordReset(
             @Parameter(description = "Password-reset token from the email link") @PathVariable("token") String token,
-            @RequestBody ChangePasswordRequest changePasswordRequest) {
+            @Valid@RequestBody ChangePasswordRequest changePasswordRequest) {
         return userService.executePasswordReset(token, changePasswordRequest.getNewPassword());
     }
 }

@@ -40,17 +40,6 @@ public class LibrarianController {
         return librarianService.getUsers();
     }
 
-    @Operation(summary = "Delete a user", description = "Permanently removes the user. A librarian cannot delete their own account. Librarian only.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "User deleted"),
-            @ApiResponse(responseCode = "404", description = "No user with this id"),
-            @ApiResponse(responseCode = "409", description = "You cannot change your own account")
-    })
-    @DeleteMapping("/users/delete/{userId}")
-    public ResponseEntity<Void> deleteUser(@Parameter(description = "Id of the user") @PathVariable Long userId, Authentication authentication) {
-        librarianService.deleteUser(userId, authentication.getName());
-        return ResponseEntity.noContent().build();
-    }
 
     @Operation(summary = "Deactivate a user", description = "The user can no longer log in, and existing tokens stop working. Librarian only.")
     @ApiResponses({

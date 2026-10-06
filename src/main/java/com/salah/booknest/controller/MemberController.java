@@ -29,7 +29,7 @@ public class MemberController {
             examples = @ExampleObject(value = "{\"newPassword\":\"NewPassw0rd!\"}")))
     @PutMapping("/change-password")
     public ResponseEntity<String> changePassword(@AuthenticationPrincipal UserDetails userDetails,
-                                                 @RequestBody ChangePasswordRequest request){
+                                                 @Valid @RequestBody ChangePasswordRequest request){
         String result = memberService.changePassword(userDetails.getUsername(), request.getNewPassword());
         return ResponseEntity.ok(result);
     }
