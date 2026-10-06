@@ -83,10 +83,7 @@ public class BookService {
     private static final Set<String> SORTABLE_FIELDS = Set.of("id", "title", "publishedYear", "createdAt");
     private static final int MAX_PAGE_SIZE = 100;
 
-    /**
-     * One page of books. Optional filters: title (contains, ignoring case) and genre (exact name, ignoring case).
-     * Page size is capped and only whitelisted fields can be sorted on, so bad input gives a 400 instead of a 500.
-     */
+
     @Transactional(readOnly = true)
     public Page<BookResponse> getBooks(String title, String genre, int page, int size, String sortBy, String sortDir) {
         if (!SORTABLE_FIELDS.contains(sortBy)) {
