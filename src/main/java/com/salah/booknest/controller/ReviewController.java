@@ -60,7 +60,7 @@ public class ReviewController {
             examples = @ExampleObject(value = "{\"rating\":9,\"comment\":\"Even better on a second read.\"}")))
     @PutMapping("/reviews/{reviewId}")
     public ReviewResponse updateReview(@Parameter(description = "Id of the review") @PathVariable Long reviewId,
-                                       @RequestBody ReviewRequest request,
+                                       @Valid @RequestBody ReviewRequest request,
                                        Authentication authentication) {
         return reviewService.update(reviewId, request, authentication);
     }

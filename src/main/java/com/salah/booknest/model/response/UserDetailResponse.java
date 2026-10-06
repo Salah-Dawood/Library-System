@@ -5,7 +5,6 @@ import com.salah.booknest.model.UserProfile;
 
 import java.time.LocalDateTime;
 
-/** Everything a librarian may see about a user. Never includes the password or verification code. */
 public record UserDetailResponse(
         Long id,
         String username,
@@ -19,7 +18,6 @@ public record UserDetailResponse(
     public record Profile(String firstName, String lastName, Integer age, String bio, String imageUrl) {
     }
 
-    /** Must be called while the Hibernate session is open, because the profile is lazy. */
     public static UserDetailResponse from(User user) {
         UserProfile p = user.getUserProfile();
         Profile profile = p == null ? null

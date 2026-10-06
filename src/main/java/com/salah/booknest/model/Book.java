@@ -30,11 +30,11 @@ public class Book {
     private String title;
 
     @ManyToOne(optional = false)
-    @JoinColumn(name = "author_id")
+    @JoinColumn(name = "author_id",unique = true)
     @JsonIgnoreProperties("books")
     private Author author;
 
-    @Column(nullable = false)
+    @Column(nullable = false,unique = true)
     private String isbn;
 
     @Column(nullable = false)

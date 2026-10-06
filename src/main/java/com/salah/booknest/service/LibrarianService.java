@@ -20,7 +20,6 @@ public class LibrarianService {
     private final UserRepository userRepository;
     private final AuditLogService auditLogService;
 
-    /** One user with their profile, for the librarian's user page. */
     @Transactional(readOnly = true)
     public UserDetailResponse getUserDetail(Long userId) {
         User user = userRepository.findById(userId)

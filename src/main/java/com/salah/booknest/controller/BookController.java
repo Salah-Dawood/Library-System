@@ -93,7 +93,7 @@ public class BookController {
     @PutMapping("/{bookId}")
     @PreAuthorize("hasRole('librarian')")
     public ResponseEntity updateBook(@Parameter(description = "Id of the book") @PathVariable Long bookId,
-                                     @RequestBody CreateBookRequest request){
+                                     @Valid @RequestBody CreateBookRequest request){
         return bookService.updateBook(bookId,request);
     }
 

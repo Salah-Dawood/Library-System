@@ -172,7 +172,6 @@ public class BookService {
         return new ResponseEntity<>(bookResponser(savedBook), HttpStatus.CREATED);
     }
 
-    /** Edits only the fields that are sent. The ISBN must stay unique, but a book may keep its own. */
     @Transactional
     public ResponseEntity<?> updateBook(Long bookId, CreateBookRequest request) {
         Book book = bookRepository.findById(bookId)
@@ -223,10 +222,7 @@ public class BookService {
         return ResponseEntity.noContent().build();
     }
 
-    /**
-     * Changes the stock while keeping the number of copies currently on loan constant,
-     * so available copies can never exceed the total. The row is locked against concurrent approvals.
-     */
+
     private void updateTotalCopies(Long bookId, int newTotal) {
         Inventory inventory = inventoryRepository.findByBookIdForUpdate(bookId)
                 .orElseThrow(() -> new InformationNotFoundException("Inventory for book " + bookId + " not found"));
