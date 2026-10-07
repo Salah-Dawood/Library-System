@@ -1,7 +1,6 @@
 package com.salah.booknest.model.request;
 
 
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
