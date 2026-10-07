@@ -58,16 +58,47 @@ The system bridges the gap between readers and library administrators by replaci
 * **Springdoc OpenAPI / Swagger UI:** Automatically generated, interactive REST API documentation interface.
 
 
-
 ## Architecture
-Explain your application's architecture and major components.
+## System Architecture
+
+The backend application follows a standard **layered architecture** design pattern to separate concerns, ensure maintainability, and enforce loose coupling. Request data flows linearly through the following layers:
+
+### Supporting Components & Modules
+
+* **Security Layer**
+    * Implemented using **Spring Security** and stateless **JWT** interceptors.
+    * Intercepts incoming requests to perform authentication, validate tokens, and enforce role-based authorization (Member vs. Librarian).
+    * Integrates **Bucket4j** and **Caffeine Cache** directly into filter chains to enforce rate-limiting constraints per API user.
+
+* **Data Transfer Objects (DTOs)**
+    * Lightweight objects used to decouple internal database entities from external API payloads.
+    * Prevents input into database that are not meant to be entered by users such as create/update time stamps
+    * Prevents the exposure of sensitive database fields (like password hashes or auto-incremented keys) over public networks.
+
+
+* **Exception Handling (`@RestControllerAdvice`)**
+    * A centralized global exception handler that captures errors thrown anywhere within the application stack.
+    * Translates custom errors (e.g., `BookNotAvailableException`, `InvalidTokenException`) into uniform, client-friendly JSON error structures containing consistent timestamps and status codes.
+
+* **Server-Sent Events (SSE Functionality)**
+    * Provides a lightweight, one-way asynchronous streaming connection between the server and the frontend client.
+    * Enables the backend to immediately push live, real-time request status updates (in this case from REQUESTED to APPROVED) to the member's browser without requiring continuous polling.
+
+* **Configuration Layer (`@Configuration`)**
+    * Centralizes all Java-based system configurations.
+    * Bootstraps beans for external services including **Spring Mail**, **Mailtrap Java SDK**, OpenApi/Swagger documentation setups, caching layers, and CORS filters.
+    * Also when running for the first time or in an empty users table, the seeder seeds the database with initial users and other entities
+
 
 ## General Approach
 Include a couple of paragraphs explaining:
 
-How you approached the project.
-How you structured your application.
-How you implemented the major features.
+### Approach
+I started the project by implementing the user services such as registering and logging in and verifying email and so on.
+That gave me a foundation to cuntinue working with the already implemented JWT security to restrict administrative services to tokens that include librarian role.
+### Structure
+I structure the app revolving around the book table and the system functionalities, this left the structure to always be scalable (ex. I initially did not have authors and reviews tables in mind).
+
 
 ## User Stories
 [Trello: user stories.](https://trello.com/invite/b/6ac5e7834bebef07fc444288/ATTIdecc791734b4cd6ac191843744f7f8216F35C90A/booknest)
@@ -188,8 +219,8 @@ Bonus: frontend utilizing Java backend (**AI GENERATED**)
 #### Swagger
 http://localhost:9091/swagger-ui/index.html
 
-## Installation
 
+## Installation (how to run)
 Follow these steps to configure your IntelliJ environment and run the BookNest system locally.
 
 ### Prerequisites
