@@ -90,7 +90,102 @@ Bonus: frontend utilizing Java backend (**AI GENERATED**)
 * **Day 7:** apply testing, write documentation
 
 ### API Documentation
-While the Project is Running:
+#### Endpoints
+
+**Auth legend:** 🌐 Public · 🔑 Any logged-in user (JWT) · 📚 Librarian only
+
+##### Authentication & Email (`/auth`)
+
+| Method | Endpoint | Description | Access |
+|--------|----------|-------------|--------|
+| POST | `/auth/users/register` | Register a new member | 🌐 |
+| POST | `/auth/users/login` | Log in and receive a JWT | 🌐 |
+| PUT | `/auth/users/passwordreset/{token}` | Reset password using emailed token | 🌐 |
+| PUT | `/auth/email/getverification/{username}` | Send email verification code | 🌐 |
+| PUT | `/auth/email/verify/{username}?code=` | Verify email with code | 🌐 |
+| PUT | `/auth/email/forgotpassword` | Send password-reset email | 🌐 |
+
+##### Books (`/api/books`)
+
+| Method | Endpoint | Description | Access |
+|--------|----------|-------------|--------|
+| GET | `/api/books` | List books (paged). Params: `title`, `genre`, `page`, `size`, `sortBy`, `sortDir` | 🔑 |
+| GET | `/api/books/{bookId}` | Get one book with stock and rating | 🔑 |
+| GET | `/api/books/search/{title}` | Get a book by exact title | 🔑 |
+| POST | `/api/books` | Create a book | 📚 |
+| PUT | `/api/books/{bookId}` | Update a book | 📚 |
+| DELETE | `/api/books/{bookId}` | Delete a book | 📚 |
+
+##### Authors (`/api/authors`)
+
+| Method | Endpoint | Description | Access |
+|--------|----------|-------------|--------|
+| GET | `/api/authors` | List all authors | 🔑 |
+| GET | `/api/authors/{authorId}` | Get author by id | 🔑 |
+| GET | `/api/authors/search/{name}` | Get author by exact name | 🔑 |
+| POST | `/api/authors` | Create an author | 📚 |
+| PUT | `/api/authors/{authorId}` | Update an author | 📚 |
+| DELETE | `/api/authors/{authorId}` | Delete an author | 📚 |
+
+##### Genres (`/api/genres`)
+
+| Method | Endpoint | Description | Access |
+|--------|----------|-------------|--------|
+| GET | `/api/genres` | List all genres | 🔑 |
+| GET | `/api/genres/{name}` | Get genre by exact name | 🔑 |
+| POST | `/api/genres` | Create a genre | 📚 |
+| PUT | `/api/genres/{genreId}` | Update a genre | 📚 |
+| DELETE | `/api/genres/{genreId}` | Delete a genre | 📚 |
+
+##### Loans (`/api/loans`)
+
+| Method | Endpoint | Description | Access |
+|--------|----------|-------------|--------|
+| POST | `/api/loans` | Request a book loan (`bookId`, `duration` 1-30 days) | 🔑 |
+| GET | `/api/loans/my-loans` | List my loans | 🔑 |
+| GET | `/api/loans/my-stats` | My return statistics and reliability badge | 🔑 |
+| PUT | `/api/loans/{loanId}/cancel` | Cancel a loan (owner: requested only; librarian: also approved) | 🔑 |
+| PUT | `/api/loans/{loanId}/return` | Return a borrowed book (owner or librarian) | 🔑 |
+| GET | `/api/loans?status=` | List all loans, optional status filter | 📚 |
+| GET | `/api/loans/user/{userId}` | List a user's loans | 📚 |
+| GET | `/api/loans/user/{userId}/stats` | A user's return statistics | 📚 |
+| PUT | `/api/loans/{loanId}/approve` | Approve a loan request | 📚 |
+| PUT | `/api/loans/{loanId}/reject` | Reject a loan request (optional `reason`) | 📚 |
+
+##### Reviews (`/api`)
+
+| Method | Endpoint | Description | Access |
+|--------|----------|-------------|--------|
+| GET | `/api/books/{bookId}/reviews` | Get reviews and rating summary for a book | 🔑 |
+| POST | `/api/books/{bookId}/reviews` | Add a review (`rating`, `comment`) | 🔑 |
+| PUT | `/api/reviews/{reviewId}` | Update a review | 🔑 |
+| DELETE | `/api/reviews/{reviewId}` | Delete a review | 🔑 |
+
+##### Member Profile (`/api/member`)
+
+| Method | Endpoint | Description | Access |
+|--------|----------|-------------|--------|
+| GET | `/api/member/profile` | Get my profile | 🔑 |
+| PUT | `/api/member/update/profile` | Update my profile (multipart, optional image) | 🔑 |
+| PUT | `/api/member/change-password` | Change my password | 🔑 |
+
+##### Librarian Admin (`/api/librarian`, `/api/audit-log`)
+
+| Method | Endpoint | Description | Access |
+|--------|----------|-------------|--------|
+| GET | `/api/librarian/users` | List all users | 📚 |
+| GET | `/api/librarian/users/{userId}` | Get user details | 📚 |
+| PUT | `/api/librarian/users/deactivate/{userId}` | Deactivate a user | 📚 |
+| PUT | `/api/librarian/users/activate/{userId}` | Activate a user | 📚 |
+| GET | `/api/audit-log?type=&userId=` | View audit log (`USER`, `BOOK`, `LOAN`, `REVIEW`) | 📚 |
+
+##### Notifications
+
+| Method | Endpoint | Description | Access |
+|--------|----------|-------------|--------|
+| GET | `/api/notifications/stream` | Real-time notifications (Server-Sent Events) | 🔑 |
+
+#### Swagger
 http://localhost:9091/swagger-ui/index.html
 
 ## Installation
