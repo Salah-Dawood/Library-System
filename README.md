@@ -107,6 +107,7 @@ Before running the application, ensure you have the following ready:
 
 ### Configure IntelliJ Environment Variables
 configure the following environment variables that will be used by application.properties
+
 #### General
 * **DB_PASSWORD:** your PostgreSQL password
 * **JWT_SECRET:** This must be a secure, random string of at least 64 characters (512 bits)
