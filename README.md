@@ -32,8 +32,6 @@ The system bridges the gap between readers and library administrators by replaci
 
 ## Technologies
 
-## Built With
-
 ### Backend Framework & Core
 * **Java:** Core programming language.
 * **Spring Boot:** Main application framework.
@@ -75,41 +73,27 @@ How you implemented the major features.
 [Trello: user stories.](https://trello.com/invite/b/6ac5e7834bebef07fc444288/ATTIdecc791734b4cd6ac191843744f7f8216F35C90A/booknest)
 
 ## ERD
-Provide a link/image of your ERD.
-
-## Planning
-Provide a link to your planning documentation/GitHub Project showing:
+[ERD](https://github.com/Salah-Dawood/Library-System/blob/main/Library-System.png)
 
 ### Deliverables
 Java Spring boot project
-Bonus: frontend utilizing Java backend
+Bonus: frontend utilizing Java backend (**AI GENERATED**)
 
 ### Timeline
 7 Day Project
-* **Day 1:** 
-* **Day 2:**
-* **Day 3:**
-* **Day 4:**
-* **Day 5:**
-* **Day 6:**
-* **Day 7:**
-
+* **Day 1:** planning architecture 
+* **Day 2:** initializing project & creating authentication architecture
+* **Day 3:** implementing required models
+* **Day 4:** implementing endpoints and business logic
+* **Day 5:** implementing technical requirements (SSE,Seeding,Logging,Rate limting)
+* **Day 6:** implementing technical requirements (pagination,sorting,filteration,swagger)
+* **Day 7:** apply testing, write documentation
 
 ### API Documentation
 While the Project is Running:
 http://localhost:9091/swagger-ui/index.html
 
 ## Installation
-Provide clear instructions explaining how another developer can:
-
-Clone the repository.
-Configure the application.
-Configure PostgreSQL.
-Configure environment variables.
-Seed the database.
-Start the application.
-Access the API.
-Access Swagger/OpenAPI.
 
 Follow these steps to configure your IntelliJ environment and run the BookNest system locally.
 
@@ -121,7 +105,7 @@ Before running the application, ensure you have the following ready:
 * A **Mailtrap** account for email testing (if using dev profile)
 * A **Email account** with an app password (if using demo profile)
 
-### Configure Intellij Environment Variables
+### Configure IntelliJ Environment Variables
 configure the following environment variables that will be used by application.properties
 #### General
 * **DB_PASSWORD:** your PostgreSQL password
@@ -139,10 +123,16 @@ configure the following environment variables that will be used by application.p
 
 
 ## Unsolved Problems
-Document any unresolved issues.
-
+Some requirements implemented are not system system wide, rather only implemented once to show understanding of using the feature.
 ## Major Challenges
-Explain the major technical problems you encountered and how you solved them.
-
+Had a small problem configuring a Many to Many relationship between two entities for the first time, but i found it nice that java/spring boot handles making the junction table.
 ## Future Improvements
-Explain what you would add if you had more time.
+**Spread the requirements** accross the system where it would be appropriate and efficient.
+**Implement email notification** for loan status updates
+
+## Credits & External Resources
+* **URL:** [Claude](https://claude.ai)
+* **Purpose:** Built a clean, simple frontend interface for the project demo.
+
+* **URL:** [Google AI Mode](https://ai.google)
+* **Purpose:** Provided end-to-end architectural guidance, explained complex Java structures, and mentored on industry best practices throughout development.
