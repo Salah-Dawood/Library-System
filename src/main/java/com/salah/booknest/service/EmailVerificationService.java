@@ -29,6 +29,9 @@ public class EmailVerificationService {
     @Value("${server.root}")
     private String root;
 
+    @Value("${ngrok.url}")
+    private String ngrokUrl;
+
     @Autowired
     public EmailVerificationService(UserRepository userRepository,
                                     JavaMailSender mailSender,
@@ -110,7 +113,7 @@ public class EmailVerificationService {
                 .orElseThrow(() -> new InformationNotFoundException("Username " + request.getUsername() + " not found"));
 
         String token = jwtUtils.generatePasswordResetToken(request.getUsername());
-        String resetUrl = root + "/#/reset?token=" + token;
+        String resetUrl = ngrokUrl + "/#/reset?token=" + token;
         String subject = "BookNest - Password Reset";
 
         Context context = new Context();
