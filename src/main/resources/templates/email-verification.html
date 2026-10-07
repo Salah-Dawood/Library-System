@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html xmlns:th="http://thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Verify Your Email</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f9f9f9;">
+<div style="max-width: 550px; margin: 40px auto; padding: 30px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+
+    <h2 style="color: #2c3e50; margin-top: 0; text-align: center;">Welcome to BookNest! 📚</h2>
+    <p style="color: #7f8c8d; font-size: 16px; line-height: 1.5; text-align: center;">Thank you for signing up. Use the verification code below to secure your account:</p>
+
+    <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin: 30px 0;">
+        <tr>
+            <!-- LEFT SIDE: Pulls the URL from application.properties context -->
+            <td width="30%" align="right" style="padding-right: 10px; vertical-align: middle;">
+                <img th:src="${Gif}"
+                     alt="GIF Left"
+                     width="90"
+                     style="border-radius: 6px; display: inline-block; vertical-align: middle;" />
+            </td>
+
+            <!-- MIDDLE COLUMN: The Verification Code Box -->
+            <td width="40%" align="center" style="vertical-align: middle;">
+                <div style="display: inline-block; background-color: #f8f9fa; border: 2px dashed #3498db; padding: 12px 20px; font-size: 26px; font-weight: bold; color: #2980b9; letter-spacing: 4px; border-radius: 4px; vertical-align: middle; white-space: nowrap;"
+                     th:text="${code}">1000</div>
+            </td>
+
+            <!-- RIGHT SIDE: Pulls the same property URL string -->
+            <td width="30%" align="left" style="padding-left: 10px; vertical-align: middle;">
+                <img th:src="${Gif}"
+                     alt="GIF Right"
+                     width="90"
+                     style="border-radius: 6px; display: inline-block; vertical-align: middle;" />
+            </td>
+        </tr>
+    </table>
+
+    <p style="color: #95a5a6; font-size: 12px; margin-top: 25px; border-top: 1px solid #eee; padding-top: 15px; text-align: center;">If you did not create this account, you can safely ignore this email.</p>
+</div>
+</body>
+</html>

@@ -48,7 +48,7 @@ public class EmailVerificationController {
             @ApiResponse(responseCode = "429", description = "Too many requests")
     })
     @PutMapping("/verify/{username}")
-    public String vertifyEmail(@Parameter(description = "Username") @PathVariable String username, @Parameter(description = "Verification code from the email") @RequestParam int code){
+    public boolean vertifyEmail(@Parameter(description = "Username") @PathVariable String username, @Parameter(description = "Verification code from the email") @RequestParam int code){
         return emailVerificationService.verifyEmail(username,code);
     }
 

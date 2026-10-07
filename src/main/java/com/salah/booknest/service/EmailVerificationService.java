@@ -6,11 +6,15 @@ import com.salah.booknest.model.User;
 import com.salah.booknest.model.request.UsernameRequest;
 import com.salah.booknest.repository.UserRepository;
 import com.salah.booknest.security.JWTUtils;
+import jakarta.mail.MessagingException;
+import jakarta.mail.internet.MimeMessage;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
+import org.thymeleaf.TemplateEngine;
+import org.thymeleaf.context.Context;
 
 import java.util.Random;
 
@@ -20,6 +24,7 @@ public class EmailVerificationService {
     private final UserRepository userRepository;
     private final JavaMailSender mailSender;
     private final JWTUtils jwtUtils;
+    private final TemplateEngine templateEngine;
 
     @Value("${server.root}")
     private String root;
@@ -27,10 +32,11 @@ public class EmailVerificationService {
     @Autowired
     public EmailVerificationService(UserRepository userRepository,
                                     JavaMailSender mailSender,
-                                    JWTUtils jwtUtils){
+                                    JWTUtils jwtUtils, TemplateEngine templateEngine){
         this.userRepository = userRepository;
         this.mailSender = mailSender;
         this.jwtUtils = jwtUtils;
+        this.templateEngine = templateEngine;
     }
 
     // This reads configured username to use as the sender address
@@ -40,31 +46,44 @@ public class EmailVerificationService {
     @Value("${spring.mail.domain}")
     private String domain;
 
+    @Value("${app.email.gif-url}")
+    private String gifUrl;
+
+
 
 
     //SEND EMAIL METHOD used by all methods that send an email
+    public void sendEmail(String email, String subject, String htmlContent) {
+        try {
+            MimeMessage mimeMessage = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
 
-    public void sendEmail(String email,String subject,String text){
-        SimpleMailMessage message = new SimpleMailMessage();
+            helper.setFrom(senderEmail + domain);
+            helper.setTo(email);
+            helper.setSubject(subject);
+            helper.setText(htmlContent, true);
 
-        message.setFrom(senderEmail + domain);
-        message.setTo(email);
-        message.setSubject(subject);
-        message.setText(text);
-
-        mailSender.send(message);
+            mailSender.send(mimeMessage);
+        } catch (MessagingException e) {
+            throw new IllegalStateException("Failed to send HTML email to " + email, e);
+        }
     }
+
 
     public void sendVerificationCode(User user) {
         int code = generateVerificationCode();
-
         String email = user.getEmailAddress();
         String subject = "BookNest - Verify Your Email Address";
-        String text = "Your verification code is: " + code;
+
+        Context context = new Context();
+        context.setVariable("code", code);
+        context.setVariable("Gif", gifUrl);
+
+        String htmlContent = templateEngine.process("email-verification", context);
 
         user.setEmailVerificationCode(code);
         userRepository.save(user);
-        sendEmail(email,subject,text);
+        sendEmail(email, subject, htmlContent);
     }
 
     //generate code helper method
@@ -74,7 +93,7 @@ public class EmailVerificationService {
         return 1000 + random.nextInt(9000);
     }
 
-    public String verifyEmail(String username, int code) {
+    public boolean verifyEmail(String username, int code) {
         User user = userRepository.findUserByUsername(username)
                 .orElseThrow(() -> new InformationNotFoundException("Username " + username + " not found"));
         Integer stored = user.getEmailVerificationCode();
@@ -83,17 +102,23 @@ public class EmailVerificationService {
         }
         user.setIsVerified(true);
         userRepository.save(user);
-        return "success";
+        return true;
     }
 
-    public String sendResetEmail(UsernameRequest request) {
+    public void sendResetEmail(UsernameRequest request) {
         User user = userRepository.findUserByUsername(request.getUsername())
                 .orElseThrow(() -> new InformationNotFoundException("Username " + request.getUsername() + " not found"));
+
         String token = jwtUtils.generatePasswordResetToken(request.getUsername());
-        String text = "Ignore this email if you did not initiate the password reset process.\n" +
-                "Click the following link to reset your password:\n" +
-                root + "/#/reset?token=" + token;
-        sendEmail(user.getEmailAddress(), "Book Nest - Password Reset", text);
-        return "yooho";
+        String resetUrl = root + "/#/reset?token=" + token;
+        String subject = "BookNest - Password Reset";
+
+        Context context = new Context();
+        context.setVariable("resetUrl", resetUrl);
+        context.setVariable("Gif", gifUrl);
+
+        String htmlContent = templateEngine.process("forgot-password", context);
+
+        sendEmail(user.getEmailAddress(), subject, htmlContent);
     }
 }
