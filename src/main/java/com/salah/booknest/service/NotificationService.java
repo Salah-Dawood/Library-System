@@ -24,6 +24,11 @@ public class NotificationService {
     private final Map<String, List<SseEmitter>> emitters = new ConcurrentHashMap<>();
     private final Set<String> librarians = ConcurrentHashMap.newKeySet();
 
+    /**
+     * Opens a live notification stream (Server-Sent Events) for a user and sends a CONNECTED event.
+     * A user can have several open streams, for example in multiple browser tabs. Librarians are
+     * remembered so they can receive librarian-wide events.
+     */
     public SseEmitter subscribe(String username, boolean librarian) {
         SseEmitter emitter = new SseEmitter(TIMEOUT_MS);
         emitters.computeIfAbsent(username, key -> new CopyOnWriteArrayList<>()).add(emitter);
@@ -47,6 +52,9 @@ public class NotificationService {
         }
     }
 
+    /**
+     * Sends an event to every librarian who currently has an open stream.
+     */
     public void notifyLibrarians(NotificationEvent event) {
         librarians.forEach(username -> notifyUser(username, event));
     }
@@ -60,6 +68,9 @@ public class NotificationService {
         }
     }
 
+    /**
+     * Forgets a closed stream; when the user has no streams left they are also removed from the librarian list.
+     */
     private void remove(String username, SseEmitter emitter) {
         List<SseEmitter> userEmitters = emitters.get(username);
         if (userEmitters == null) {

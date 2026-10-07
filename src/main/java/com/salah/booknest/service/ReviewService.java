@@ -38,6 +38,10 @@ public class ReviewService {
     private final LoanRepository loanRepository;
     private final AuditLogService auditLogService;
 
+    /**
+     * Returns all reviews of a book with the average rating, plus whether the current user can still
+     * write a review (they returned the book and have not reviewed it yet) and the id of their own review if any.
+     */
     @Transactional(readOnly = true)
     public ReviewSummary getBookReviews(Long bookId, Authentication authentication) {
         getBook(bookId);
@@ -58,6 +62,12 @@ public class ReviewService {
                 myReviewId);
     }
 
+    /**
+     * Adds a review. Only members who have returned the book may review it, and only once per book.
+     *
+     * @throws InvalidStateException if the member never returned this book
+     * @throws InformationExistException if the member already reviewed this book
+     */
     @Transactional
     public ReviewResponse create(Long bookId, ReviewRequest request, Authentication authentication) {
         String comment = validate(request);
@@ -97,6 +107,9 @@ public class ReviewService {
         return ReviewResponse.from(review, user.getId());
     }
 
+    /**
+     * Deletes a review. Allowed for its author or a librarian. The audit entry is written first so it can still refer to the review.
+     */
     @Transactional
     public void delete(Long reviewId, Authentication authentication) {
         User user = getUser(authentication);
@@ -109,6 +122,11 @@ public class ReviewService {
         reviewRepository.delete(review);
     }
 
+    /**
+     * Checks that the rating is 1 to 10 and the comment is at most 1000 characters.
+     *
+     * @return the trimmed comment, or null when it is empty
+     */
     private String validate(ReviewRequest request) {
         if (request == null || request.rating() == null
                 || request.rating() < MIN_RATING || request.rating() > MAX_RATING) {

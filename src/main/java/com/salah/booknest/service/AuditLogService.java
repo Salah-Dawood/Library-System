@@ -31,16 +31,29 @@ public class AuditLogService {
     private final AuditLogRepository auditLogRepository;
     private final UserRepository userRepository;
 
+    /**
+     * Records an audit entry for the user who is currently logged in.
+     * If nobody is authenticated the entry is recorded as done by the system.
+     */
     @Transactional
     public void log(String type, String action, Long whatId) {
         routeLog(new AuditTriggerInfo(type, currentUserId(), whatId, action, LocalDateTime.now()));
     }
 
+    /**
+     * Records an audit entry for an explicit user id, for actions where no one is logged in yet (for example registration).
+     */
     @Transactional
     public void logAs(String type, Long userId, String action, Long whatId) {
         routeLog(new AuditTriggerInfo(type, userId, whatId, action, LocalDateTime.now()));
     }
 
+    /**
+     * Hands the entry to the first audit channel that supports its type, which saves it,
+     * and writes a readable line to the audit logger once the transaction commits.
+     *
+     * @throws IllegalArgumentException if no channel supports the entry type
+     */
     @Transactional
     public void routeLog(AuditTriggerInfo info) {
         AuditChannel matchingChannel = channels.stream()
@@ -77,6 +90,9 @@ public class AuditLogService {
                 .orElse("user #" + userId);
     }
 
+    /**
+     * Defers the action until the transaction commits; runs it immediately when there is no active transaction.
+     */
     private void afterCommit(Runnable action) {
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
             action.run();

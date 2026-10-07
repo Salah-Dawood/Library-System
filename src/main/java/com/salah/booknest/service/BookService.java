@@ -50,6 +50,10 @@ public class BookService {
         this.auditLogService = auditLogService;
     }
 
+    /**
+     * Converts a book entity into the response sent to clients, adding author name, genre names,
+     * stock, review count and the average rating rounded to one decimal.
+     */
     public BookResponse bookResponser(Book book){
         BookResponse response = new BookResponse();
         response.setId(book.getId());
@@ -84,6 +88,12 @@ public class BookService {
     private static final int MAX_PAGE_SIZE = 100;
 
 
+    /**
+     * Returns one page of books. The title filter matches part of the title and the genre filter
+     * matches the exact genre name, both ignoring case. Page size is limited to 100.
+     *
+     * @throws InvalidRequestException if sortBy is not id, title, publishedYear or createdAt
+     */
     @Transactional(readOnly = true)
     public Page<BookResponse> getBooks(String title, String genre, int page, int size, String sortBy, String sortDir) {
         if (!SORTABLE_FIELDS.contains(sortBy)) {
@@ -172,6 +182,12 @@ public class BookService {
         return new ResponseEntity<>(bookResponser(savedBook), HttpStatus.CREATED);
     }
 
+    /**
+     * Partial update: only the fields that are not null in the request are changed.
+     * A new genre list replaces the old one, and a new total copies value adjusts stock (see updateTotalCopies).
+     *
+     * @throws InformationExistException if the ISBN already belongs to another book
+     */
     @Transactional
     public ResponseEntity<?> updateBook(Long bookId, CreateBookRequest request) {
         Book book = bookRepository.findById(bookId)
@@ -211,6 +227,9 @@ public class BookService {
         return new ResponseEntity<>(bookResponser(saved), HttpStatus.OK);
     }
 
+    /**
+     * Deletes a book together with its inventory and loans. The audit entry is written first so it can still refer to the book.
+     */
     @Transactional
     public ResponseEntity<Void> deleteBook(Long bookId) {
         if (!bookRepository.existsById(bookId)) {
@@ -223,6 +242,12 @@ public class BookService {
     }
 
 
+    /**
+     * Changes the total number of copies while keeping the copies currently on loan unchanged:
+     * available copies become the new total minus the copies on loan.
+     *
+     * @throws InvalidRequestException if the new total is lower than the number of copies on loan
+     */
     private void updateTotalCopies(Long bookId, int newTotal) {
         Inventory inventory = inventoryRepository.findByBookIdForUpdate(bookId)
                 .orElseThrow(() -> new InformationNotFoundException("Inventory for book " + bookId + " not found"));

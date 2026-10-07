@@ -70,6 +70,14 @@ public class LoanService {
 
     //workflow
 
+    /**
+     * Creates a new loan request in the REQUESTED state for the logged-in member.
+     * Stock is not touched here; a copy is only taken when a librarian approves.
+     *
+     * @throws InvalidRequestException if the book id is missing or the duration is not 1 to 30 days
+     * @throws InformationExistException if the member already has an active request or loan for this book
+     * @throws InvalidStateException if the member already has 5 active requests or loans
+     */
     @Transactional
     public LoanResponse requestLoan(Authentication authentication, LoanRequest request) {
         if (request.getBookId() == null) {
@@ -103,6 +111,13 @@ public class LoanService {
         return LoanResponse.from(loan);
     }
 
+    /**
+     * Approves a REQUESTED loan: takes one copy out of stock and sets the loan date
+     * to today and the due date to today plus the requested days.
+     * The inventory row is locked so two librarians cannot hand out the last copy twice.
+     *
+     * @throws InvalidStateException if the loan is not REQUESTED or no copies are available
+     */
     @Transactional
     public LoanResponse approve(Long loanId, Authentication librarian) {
         Loan loan = getLoanForUpdate(loanId);
@@ -142,6 +157,13 @@ public class LoanService {
     }
 
 
+    /**
+     * Cancels a loan. A member may cancel only their own REQUESTED loan; only a librarian
+     * may cancel an APPROVED loan, which also puts the copy back in stock.
+     *
+     * @throws AccessDeniedException if the caller is not allowed to cancel this loan
+     * @throws InvalidStateException if the loan is already finished (rejected, cancelled or returned)
+     */
     @Transactional
     public LoanResponse cancel(Long loanId, Authentication authentication) {
         Loan loan = getLoanForUpdate(loanId);
@@ -174,6 +196,13 @@ public class LoanService {
     }
 
 
+    /**
+     * Marks an APPROVED loan as returned today, puts the copy back in stock and reports
+     * whether it came back early, on time or late. Allowed for the borrower or a librarian.
+     *
+     * @throws AccessDeniedException if the caller is neither the borrower nor a librarian
+     * @throws InvalidStateException if the loan is not APPROVED
+     */
     @Transactional
     public LoanResponse returnLoan(Long loanId, Authentication authentication) {
         Loan loan = getLoanForUpdate(loanId);
@@ -207,6 +236,10 @@ public class LoanService {
     }
 
     //count return status
+    /**
+     * Summarises how a user returns books: counts of early, on-time and late returns and the
+     * percentage returned on time or early. The reliable badge needs at least 3 returns and 90% or more on time.
+     */
     @Transactional(readOnly = true)
     public ReturnStats getStats(Long userId) {
         int early = 0;
@@ -234,6 +267,9 @@ public class LoanService {
                 .orElseThrow(() -> new InformationNotFoundException("Username " + username + " not found"));
     }
 
+    /**
+     * Loads a loan with a database write lock so concurrent status changes on the same loan are serialised.
+     */
     private Loan getLoanForUpdate(Long loanId) {
         return loanRepository.findByIdForUpdate(loanId)
                 .orElseThrow(() -> new InformationNotFoundException("Loan with ID " + loanId + " not found"));
@@ -259,6 +295,9 @@ public class LoanService {
         }
     }
 
+    /**
+     * Adds one copy back to the book inventory, never going above the total number of copies.
+     */
     private void giveCopyBack(Long bookId) {
         Inventory inventory = getInventoryForUpdate(bookId);
         // Never exceed the stock, even if the data was edited by hand.
@@ -285,6 +324,9 @@ public class LoanService {
         return new NotificationEvent(type, message, loan.getId(), loan.getStatus(), LocalDateTime.now());
     }
 
+    /**
+     * Runs the action only after the transaction commits, so users are never notified about a change that was rolled back.
+     */
     private void afterCommit(Runnable action) {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override

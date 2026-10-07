@@ -85,6 +85,10 @@ public class UserService {
         }
     }
 
+    /**
+     * Authenticates the user and returns a JWT with a user summary. Users who have not verified
+     * their email get a 403 response with status USER_NOT_VERIFIED instead of a token.
+     */
     public ResponseEntity<?> loginUser(LoginRequest loginRequest) {
 
         Authentication authentication = authenticationManager.authenticate(
@@ -123,6 +127,10 @@ public class UserService {
         return ResponseEntity.ok(new LoginResponse(jwt, summary));
     }
 
+    /**
+     * Sets a new password using the token from the reset email.
+     * Returns 400 if the token is expired, invalid, or not a password-reset token.
+     */
     public ResponseEntity<String> executePasswordReset(String token,String password){
         if (!jwtUtils.validateJwtToken(token) || !jwtUtils.isPasswordResetToken(token)) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
