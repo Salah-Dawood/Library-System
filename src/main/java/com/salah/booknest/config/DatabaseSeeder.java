@@ -39,8 +39,6 @@ public class DatabaseSeeder implements CommandLineRunner {
             seedMember("johnd", "John", "Doe", "john.doe@gmail.com");
             seedMember("janed", "Jane", "Smith", "jane.smith@yahoo.com");
             seedMember("alexm", "Alex", "Miller", "alex.miller@outlook.com");
-            seedMember("emilyw", "Emily", "Watson", "emily.w@gmail.com");
-            seedMember("michaelb", "Michael", "Brown", "mbrown@gmail.com");
 
             //authors
             seedAuthor("George Orwell", 1903, "United Kingdom");
