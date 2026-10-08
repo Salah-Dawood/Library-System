@@ -108,6 +108,7 @@ I structure the app revolving around the book table and the system functionaliti
 
 ### Deliverables
 Java Spring boot project
+
 Bonus: frontend utilizing Java backend (**AI GENERATED**)
 
 ### Timeline
