@@ -8,6 +8,7 @@ import com.salah.booknest.repository.AuthorRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -21,17 +22,17 @@ public class AuthorService {
     }
 
     public List<Author> getAuthors(){
-        return authorRepository.findAll();
+        return authorRepository.findAllByActiveTrue();
     }
 
     public Author getAuthorById(Long authorId){
-        return authorRepository.findById(authorId)
-                .orElseThrow(() -> new InformationNotFoundException("Author with ID " + authorId + " is does not exist"));
+        return authorRepository.findByIdAndActiveTrue(authorId)
+                .orElseThrow(() -> new InformationNotFoundException("Active author with ID " + authorId + " does not exist"));
     }
 
     public Author getAuthorByName(String name){
-        return authorRepository.findByName(name)
-                .orElseThrow(() -> new InformationNotFoundException("Author with name " + name + " is does not exist"));
+        return authorRepository.findByNameAndActiveTrue(name)
+                .orElseThrow(() -> new InformationNotFoundException("Active author with name " + name + " does not exist"));
     }
 
     public ResponseEntity<?> createAuthor(AuthorRequest request){
@@ -42,6 +43,7 @@ public class AuthorService {
         newAuthor.setName(request.getName());
         newAuthor.setBirthYear(request.getBirthYear());
         newAuthor.setNationality(request.getNationality());
+        newAuthor.setActive(true);
 
         authorRepository.save(newAuthor);
         return new ResponseEntity<>(request, HttpStatus.CREATED);
@@ -67,11 +69,11 @@ public class AuthorService {
         return new ResponseEntity<>(authorRepository.save(author), HttpStatus.OK);
     }
 
+    @Transactional
     public ResponseEntity<?> deleteAuthor(Long authorId) {
-        if (!authorRepository.existsById(authorId)) {
-            throw new InformationNotFoundException("Author with ID " + authorId + " does not exist");
-        }
-        authorRepository.deleteById(authorId);
+        Author author = authorRepository.findById(authorId)
+                .orElseThrow(() -> new InformationNotFoundException("Author with ID " + authorId + " does not exist"));
+        author.setActive(false);
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
 }

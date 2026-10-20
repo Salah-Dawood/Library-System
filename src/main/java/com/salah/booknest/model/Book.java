@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -28,6 +29,10 @@ public class Book {
 
     @Column(nullable = false)
     private String title;
+
+    @Column(nullable = false)
+    @ColumnDefault("true")
+    private Boolean active = true;
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "author_id")
@@ -62,7 +67,7 @@ public class Book {
     private Inventory inventory;
 
     @JsonIgnore
-    @OneToMany(mappedBy = "book", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "book")
     private List<Loan> loans = new ArrayList<>();
 
 }

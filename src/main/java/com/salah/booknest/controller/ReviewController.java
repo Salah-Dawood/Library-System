@@ -72,8 +72,8 @@ public class ReviewController {
             @ApiResponse(responseCode = "404", description = "No review with this id")
     })
     @DeleteMapping("/reviews/{reviewId}")
-    public ResponseEntity<Void> deleteReview(@Parameter(description = "Id of the review") @PathVariable Long reviewId, Authentication authentication) {
+    public ResponseEntity<?> deleteReview(@Parameter(description = "Id of the review") @PathVariable Long reviewId, Authentication authentication) {
         reviewService.delete(reviewId, authentication);
-        return ResponseEntity.noContent().build();
+        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
 }

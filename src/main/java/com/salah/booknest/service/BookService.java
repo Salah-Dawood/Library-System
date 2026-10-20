@@ -3,16 +3,19 @@ package com.salah.booknest.service;
 import com.salah.booknest.exception.InformationExistException;
 import com.salah.booknest.exception.InformationNotFoundException;
 import com.salah.booknest.exception.InvalidRequestException;
+import com.salah.booknest.exception.InvalidStateException;
 import com.salah.booknest.model.Author;
 import com.salah.booknest.model.Book;
 import com.salah.booknest.model.Genre;
 import com.salah.booknest.model.Inventory;
+import com.salah.booknest.model.LoanStatus;
 import com.salah.booknest.model.request.CreateBookRequest;
 import com.salah.booknest.model.response.BookResponse;
 import com.salah.booknest.repository.AuthorRepository;
 import com.salah.booknest.repository.BookRepository;
 import com.salah.booknest.repository.GenreRepository;
 import com.salah.booknest.repository.InventoryRepository;
+import com.salah.booknest.repository.LoanRepository;
 import com.salah.booknest.repository.ReviewRepository;
 import jakarta.persistence.criteria.Join;
 import org.springframework.data.domain.Page;
@@ -34,6 +37,7 @@ public class BookService {
     private final AuthorRepository authorRepository;
     private final InventoryRepository inventoryRepository;
     private final ReviewRepository reviewRepository;
+    private final LoanRepository loanRepository;
     private final AuditLogService auditLogService;
 
     public BookService(BookRepository bookRepository,
@@ -41,12 +45,14 @@ public class BookService {
                        AuthorRepository authorRepository,
                        InventoryRepository inventoryRepository,
                        ReviewRepository reviewRepository,
+                       LoanRepository loanRepository,
                        AuditLogService auditLogService) {
         this.bookRepository = bookRepository;
         this.genreRepository = genreRepository;
         this.authorRepository = authorRepository;
         this.inventoryRepository = inventoryRepository;
         this.reviewRepository = reviewRepository;
+        this.loanRepository = loanRepository;
         this.auditLogService = auditLogService;
     }
 
@@ -103,7 +109,7 @@ public class BookService {
                 ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), MAX_PAGE_SIZE), sort);
 
-        Specification<Book> spec = (root, query, cb) -> cb.conjunction();
+        Specification<Book> spec = (root, query, cb) -> cb.isTrue(root.get("active"));
         if (title != null && !title.isBlank()) {
             spec = spec.and((root, query, cb) ->
                     cb.like(cb.lower(root.get("title")), "%" + title.trim().toLowerCase() + "%"));
@@ -121,14 +127,14 @@ public class BookService {
 
     //return Book by title
     public BookResponse getBookByTitle(String title){
-        return bookResponser(bookRepository.findByTitle(title)
-                .orElseThrow(() -> new InformationNotFoundException("book with title " + title + " not found")));
+        return bookResponser(bookRepository.findByTitleAndActiveTrue(title)
+                .orElseThrow(() -> new InformationNotFoundException("Active book with title " + title + " not found")));
     }
 
     //return Book by ID
     public BookResponse getBookById(Long bookId){
-        return bookResponser(bookRepository.findById(bookId)
-                .orElseThrow(() -> new InformationNotFoundException("book with ID " + bookId + " not found")));
+        return bookResponser(bookRepository.findByIdAndActiveTrue(bookId)
+                .orElseThrow(() -> new InformationNotFoundException("Active book with ID " + bookId + " not found")));
     }
 
 
@@ -151,8 +157,8 @@ public class BookService {
 
         // author
         if (request.getAuthorId() != null) {
-            Author author = authorRepository.findById(request.getAuthorId())
-                    .orElseThrow(() -> new InformationNotFoundException("Author not found with ID: " + request.getAuthorId()));
+            Author author = authorRepository.findByIdAndActiveTrue(request.getAuthorId())
+                    .orElseThrow(() -> new InformationNotFoundException("Active author not found with ID: " + request.getAuthorId()));
             book.setAuthor(author);
         } else {
             throw new InvalidRequestException("Author ID must be provided");
@@ -208,8 +214,8 @@ public class BookService {
             book.setPublishedYear(request.getPublishedYear());
         }
         if (request.getAuthorId() != null) {
-            book.setAuthor(authorRepository.findById(request.getAuthorId()).orElseThrow(
-                    () -> new InformationNotFoundException("Author not found with ID: " + request.getAuthorId())));
+            book.setAuthor(authorRepository.findByIdAndActiveTrue(request.getAuthorId()).orElseThrow(
+                    () -> new InformationNotFoundException("Active author not found with ID: " + request.getAuthorId())));
         }
         if (request.getGenreIds() != null) {
             Set<Genre> genres = new HashSet<>();
@@ -228,17 +234,27 @@ public class BookService {
     }
 
     /**
-     * Deletes a book together with its inventory and loans. The audit entry is written first so it can still refer to the book.
+     * Deactivates a book without deleting its loans or reviews.
+     * A book cannot be deactivated while it has a requested or approved loan.
      */
     @Transactional
-    public ResponseEntity<Void> deleteBook(Long bookId) {
-        if (!bookRepository.existsById(bookId)) {
-            throw new InformationNotFoundException("Book with ID " + bookId + " not found");
+    public ResponseEntity<?> deleteBook(Long bookId) {
+        Book book = bookRepository.findById(bookId)
+                .orElseThrow(() -> new InformationNotFoundException("Book with ID " + bookId + " not found"));
+
+        if (Boolean.FALSE.equals(book.getActive())) {
+            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
         }
-        // Audited first so the entry can still name the book it is about.
-        auditLogService.log("BOOK", "DELETED", bookId);
-        bookRepository.deleteById(bookId);
-        return ResponseEntity.noContent().build();
+
+        boolean hasActiveLoans = loanRepository.existsByBookIdAndStatusIn(
+                bookId, List.of(LoanStatus.REQUESTED, LoanStatus.APPROVED));
+        if (hasActiveLoans) {
+            throw new InvalidStateException("Book has active loans or requests and cannot be removed");
+        }
+
+        book.setActive(false);
+        auditLogService.log("BOOK", "DEACTIVATED", bookId);
+        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
 
 

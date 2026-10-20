@@ -91,6 +91,9 @@ public class LoanService {
         User user = getUserFromAuth(authentication);
         Book book = bookRepository.findById(request.getBookId()).orElseThrow(
                 () -> new InformationNotFoundException("Book with ID " + request.getBookId() + " not found"));
+        if (!Boolean.TRUE.equals(book.getActive())) {
+            throw new InvalidStateException("This book is no longer available");
+        }
 
         if (loanRepository.existsByUserIdAndBookIdAndStatusIn(user.getId(), book.getId(), ACTIVE_STATUSES)) {
             throw new InformationExistException("You already have an active request or loan for this book");

@@ -6,6 +6,7 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.ColumnDefault;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,12 +27,16 @@ public class Author {
     private String name;
 
     @Column(nullable = false)
+    @ColumnDefault("true")
+    private Boolean active = true;
+
+    @Column(nullable = false)
     private Integer birthYear;
 
     @Column(nullable = false)
     private String nationality;
 
-    @OneToMany(mappedBy = "author", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "author")
     @JsonIgnoreProperties("author")
     private List<Book> books = new ArrayList<>();
 }
