@@ -5,6 +5,7 @@ import com.salah.booknest.exception.InformationNotFoundException;
 import com.salah.booknest.exception.InvalidStateException;
 import com.salah.booknest.model.Genre;
 import com.salah.booknest.model.request.GenreRequest;
+import com.salah.booknest.model.response.GenreResponse;
 import com.salah.booknest.repository.GenreRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -24,15 +25,17 @@ public class GenreService {
 
 
     //return all genres
-    public List<Genre> getGenres(){
-        return genreRepository.findAll();
+    public List<GenreResponse> getGenres(){
+        return genreRepository.findAll().stream()
+                .map(GenreResponse::from)
+                .toList();
     }
 
     //return genre
-    public Genre getGenre(String name){
+    public GenreResponse getGenre(String name){
         Genre genre = genreRepository.findByName(name)
                 .orElseThrow(() -> new InformationNotFoundException("genre with name " + name + " not found"));
-        return genre;
+        return GenreResponse.from(genre);
     }
 
     //create genre
@@ -45,8 +48,8 @@ public class GenreService {
 
         genre.setName(request.getName());
         genre.setDescription(request.getDescription());
-        genreRepository.save(genre);
-        return new ResponseEntity<> (genre, HttpStatus.CREATED);
+        Genre savedGenre = genreRepository.save(genre);
+        return new ResponseEntity<>(GenreResponse.from(savedGenre), HttpStatus.CREATED);
     }
 
     public ResponseEntity<?> updateGenre(Long genreId, GenreRequest request) {
@@ -63,7 +66,7 @@ public class GenreService {
         if (request.getDescription() != null) {
             genre.setDescription(request.getDescription());
         }
-        return new ResponseEntity<>(genreRepository.save(genre), HttpStatus.OK);
+        return new ResponseEntity<>(GenreResponse.from(genreRepository.save(genre)), HttpStatus.OK);
     }
 
     @Transactional

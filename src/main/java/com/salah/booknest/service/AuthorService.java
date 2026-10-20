@@ -4,6 +4,7 @@ import com.salah.booknest.exception.InformationExistException;
 import com.salah.booknest.exception.InformationNotFoundException;
 import com.salah.booknest.model.Author;
 import com.salah.booknest.model.request.AuthorRequest;
+import com.salah.booknest.model.response.AuthorResponse;
 import com.salah.booknest.repository.AuthorRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -21,18 +22,22 @@ public class AuthorService {
         this.authorRepository = authorRepository;
     }
 
-    public List<Author> getAuthors(){
-        return authorRepository.findAllByActiveTrue();
+    public List<AuthorResponse> getAuthors(){
+        return authorRepository.findAllByActiveTrue().stream()
+                .map(AuthorResponse::from)
+                .toList();
     }
 
-    public Author getAuthorById(Long authorId){
-        return authorRepository.findByIdAndActiveTrue(authorId)
+    public AuthorResponse getAuthorById(Long authorId){
+        Author author = authorRepository.findByIdAndActiveTrue(authorId)
                 .orElseThrow(() -> new InformationNotFoundException("Active author with ID " + authorId + " does not exist"));
+        return AuthorResponse.from(author);
     }
 
-    public Author getAuthorByName(String name){
-        return authorRepository.findByNameAndActiveTrue(name)
+    public AuthorResponse getAuthorByName(String name){
+        Author author = authorRepository.findByNameAndActiveTrue(name)
                 .orElseThrow(() -> new InformationNotFoundException("Active author with name " + name + " does not exist"));
+        return AuthorResponse.from(author);
     }
 
     public ResponseEntity<?> createAuthor(AuthorRequest request){
@@ -45,8 +50,8 @@ public class AuthorService {
         newAuthor.setNationality(request.getNationality());
         newAuthor.setActive(true);
 
-        authorRepository.save(newAuthor);
-        return new ResponseEntity<>(request, HttpStatus.CREATED);
+        Author savedAuthor = authorRepository.save(newAuthor);
+        return new ResponseEntity<>(AuthorResponse.from(savedAuthor), HttpStatus.CREATED);
     }
 
     public ResponseEntity<?> updateAuthor(Long authorId, AuthorRequest request) {
@@ -66,7 +71,7 @@ public class AuthorService {
         if (request.getNationality() != null) {
             author.setNationality(request.getNationality());
         }
-        return new ResponseEntity<>(authorRepository.save(author), HttpStatus.OK);
+        return new ResponseEntity<>(AuthorResponse.from(authorRepository.save(author)), HttpStatus.OK);
     }
 
     @Transactional

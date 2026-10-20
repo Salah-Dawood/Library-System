@@ -4,10 +4,9 @@ import com.salah.booknest.exception.InformationNotFoundException;
 import com.salah.booknest.model.User;
 import com.salah.booknest.model.UserProfile;
 import com.salah.booknest.model.request.UpdateProfileRequest;
+import com.salah.booknest.model.response.MessageResponse;
 import com.salah.booknest.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -37,17 +36,17 @@ public class MemberService {
         this.auditLogService = auditLogService;
     }
 
-    public String changePassword(String username,String password){
+    public MessageResponse changePassword(String username,String password){
         User user = userRepository.findUserByUsername(username)
                 .orElseThrow(() -> new InformationNotFoundException("Username " + username + " not found"));
 
         user.setPassword(passwordEncoder.encode(password));
         userRepository.save(user);
         auditLogService.logAs("USER", user.getId(), "PASSWORD_CHANGED", user.getId());
-        return "password changed";
+        return new MessageResponse("Password changed successfully");
     }
 
-    public String updateProfile(String username, UpdateProfileRequest request){
+    public MessageResponse updateProfile(String username, UpdateProfileRequest request){
         User user = userRepository.findUserByUsername(username)
                 .orElseThrow(() -> new InformationNotFoundException("User not found"));
 
@@ -75,7 +74,7 @@ public class MemberService {
 
         userRepository.save(user);
         auditLogService.logAs("USER", user.getId(), "PROFILE_UPDATED", user.getId());
-        return "profile should be updated";
+        return new MessageResponse("Profile updated successfully");
     }
 
     //used to upload image and return URL

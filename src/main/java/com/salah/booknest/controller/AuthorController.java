@@ -9,7 +9,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import com.salah.booknest.model.Author;
+import com.salah.booknest.model.response.AuthorResponse;
 import com.salah.booknest.service.AuthorService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -28,18 +28,18 @@ public class AuthorController {
         this.authorService = authorService;
     }
 
-    @Operation(summary = "List authors", description = "Every author, with their books.")
+    @Operation(summary = "List authors", description = "List of authors. Each response contains author details without nested JPA entities.")
     @GetMapping("")
-    public List<Author> getAuthors(){
+    public List<AuthorResponse> getAuthors(){
         return authorService.getAuthors();
     }
 
-    @Operation(summary = "Get an author by id", description = "One author with their books.")
+    @Operation(summary = "Get an author by id", description = "Author details without nested JPA entities.")
     @ApiResponses({
             @ApiResponse(responseCode = "404", description = "No author with this id")
     })
     @GetMapping("{authorId}")
-    public Author getAuthorById(@Parameter(description = "Id of the author") @PathVariable Long authorId){
+    public AuthorResponse getAuthorById(@Parameter(description = "Id of the author") @PathVariable Long authorId){
         return authorService.getAuthorById(authorId);
     }
 
@@ -48,13 +48,13 @@ public class AuthorController {
             @ApiResponse(responseCode = "404", description = "No author with this name")
     })
     @GetMapping("/search/{name}")
-    public Author getAuthorByName(@Parameter(description = "Exact name (case-sensitive)") @PathVariable String name){
+    public AuthorResponse getAuthorByName(@Parameter(description = "Exact name (case-sensitive)") @PathVariable String name){
         return authorService.getAuthorByName(name);
     }
 
     @Operation(summary = "Create an author", description = "Author names must be unique. Librarian only.")
     @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "Author created", content = @Content(schema = @Schema(implementation = Author.class))),
+            @ApiResponse(responseCode = "201", description = "Author created", content = @Content(schema = @Schema(implementation = AuthorResponse.class))),
             @ApiResponse(responseCode = "409", description = "An author with this name already exists")
     })
     @io.swagger.v3.oas.annotations.parameters.RequestBody(content = @Content(mediaType = "application/json",
@@ -67,7 +67,7 @@ public class AuthorController {
 
     @Operation(summary = "Edit an author", description = "Only the fields you send are changed. An author can keep their own name. Librarian only.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Author updated", content = @Content(schema = @Schema(implementation = Author.class))),
+            @ApiResponse(responseCode = "200", description = "Author updated", content = @Content(schema = @Schema(implementation = AuthorResponse.class))),
             @ApiResponse(responseCode = "404", description = "No author with this id"),
             @ApiResponse(responseCode = "409", description = "Another author already has this name")
     })
@@ -80,7 +80,7 @@ public class AuthorController {
         return authorService.updateAuthor(authorId,request);
     }
 
-    @Operation(summary = "Delete an author", description = "Also deletes all of the author's books and their loans and reviews. Librarian only.")
+    @Operation(summary = "Delete an author", description = "Deactivates the author while preserving related records. Librarian only.")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Author deleted"),
             @ApiResponse(responseCode = "404", description = "No author with this id")

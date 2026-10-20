@@ -7,6 +7,7 @@ import com.salah.booknest.model.UserProfile;
 import com.salah.booknest.model.request.LoginRequest;
 import com.salah.booknest.model.request.RegisterRequest;
 import com.salah.booknest.model.response.LoginResponse;
+import com.salah.booknest.model.response.MessageResponse;
 import com.salah.booknest.repository.UserRepository;
 import com.salah.booknest.security.JWTUtils;
 import com.salah.booknest.security.MyUserDetails;
@@ -131,10 +132,10 @@ public class UserService {
      * Sets a new password using the token from the reset email.
      * Returns 400 if the token is expired, invalid, or not a password-reset token.
      */
-    public ResponseEntity<String> executePasswordReset(String token,String password){
+    public ResponseEntity<MessageResponse> executePasswordReset(String token,String password){
         if (!jwtUtils.validateJwtToken(token) || !jwtUtils.isPasswordResetToken(token)) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body("Failed to reset password: Link has expired or is invalid.");
+                    .body(new MessageResponse("Failed to reset password: link has expired or is invalid."));
         }
 
         String username = jwtUtils.getUserNameFromJwtToken(token);
@@ -145,7 +146,6 @@ public class UserService {
         user.setPassword(passwordEncoder.encode(password));
         userRepository.save(user);
 
-        return ResponseEntity.ok("Success! Your password has been updated\n" +
-                "You can close this tab and log in now.");
+        return ResponseEntity.ok(new MessageResponse("Password updated successfully. You can now log in."));
     }
 }

@@ -9,7 +9,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import com.salah.booknest.model.Genre;
+import com.salah.booknest.model.response.GenreResponse;
 import com.salah.booknest.service.GenreService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -29,9 +29,9 @@ public class GenreController {
         this.genreService = genreService;
     }
 
-    @Operation(summary = "List genres", description = "Every genre, with its books.")
+    @Operation(summary = "List genres", description = "List of genres without nested JPA book entities.")
     @GetMapping("")
-    public List<Genre> getGenres(){
+    public List<GenreResponse> getGenres(){
         return genreService.getGenres();
     }
 
@@ -40,13 +40,13 @@ public class GenreController {
             @ApiResponse(responseCode = "404", description = "No genre with this name")
     })
     @GetMapping("{name}")
-    public Genre getGenre(@Parameter(description = "Exact name (case-sensitive)") @PathVariable String name){
+    public GenreResponse getGenre(@Parameter(description = "Exact name (case-sensitive)") @PathVariable String name){
         return genreService.getGenre(name);
     }
 
     @Operation(summary = "Create a genre", description = "Genre names must be unique. Librarian only.")
     @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "Genre created", content = @Content(schema = @Schema(implementation = Genre.class))),
+            @ApiResponse(responseCode = "201", description = "Genre created", content = @Content(schema = @Schema(implementation = GenreResponse.class))),
             @ApiResponse(responseCode = "409", description = "A genre with this name already exists")
     })
     @io.swagger.v3.oas.annotations.parameters.RequestBody(content = @Content(mediaType = "application/json",
@@ -71,7 +71,7 @@ public class GenreController {
 
     @Operation(summary = "Edit a genre", description = "Only the fields you send are changed. A genre can keep its own name. Librarian only.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Genre updated", content = @Content(schema = @Schema(implementation = Genre.class))),
+            @ApiResponse(responseCode = "200", description = "Genre updated", content = @Content(schema = @Schema(implementation = GenreResponse.class))),
             @ApiResponse(responseCode = "404", description = "No genre with this id"),
             @ApiResponse(responseCode = "409", description = "Another genre already has this name")
     })

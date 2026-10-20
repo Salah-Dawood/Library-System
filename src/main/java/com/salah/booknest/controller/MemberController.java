@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import com.salah.booknest.model.UserProfile;
 import com.salah.booknest.model.request.ChangePasswordRequest;
 import com.salah.booknest.model.request.UpdateProfileRequest;
+import com.salah.booknest.model.response.MessageResponse;
 import com.salah.booknest.service.MemberService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -28,20 +29,20 @@ public class MemberController {
     @io.swagger.v3.oas.annotations.parameters.RequestBody(content = @Content(mediaType = "application/json",
             examples = @ExampleObject(value = "{\"newPassword\":\"NewPassw0rd!\"}")))
     @PutMapping("/change-password")
-    public ResponseEntity<String> changePassword(@AuthenticationPrincipal UserDetails userDetails,
+    public ResponseEntity<MessageResponse> changePassword(@AuthenticationPrincipal UserDetails userDetails,
                                                  @Valid @RequestBody ChangePasswordRequest request){
-        String result = memberService.changePassword(userDetails.getUsername(), request.getNewPassword());
+        MessageResponse result = memberService.changePassword(userDetails.getUsername(), request.getNewPassword());
         return ResponseEntity.ok(result);
     }
 
-    @Operation(summary = "Update my profile", description = "Multipart form with any of: firstName, lastName, bio, age, image (a file). Only the fields you send are changed.")
+    @Operation(summary = "Update my profile", description = "Multipart form with any of: firstName, lastName, bio, age, image (a file). Only the fields you send are changed. Returns a JSON message.")
     @ApiResponses({
             @ApiResponse(responseCode = "413", description = "Image is too large")
     })
     @PutMapping("/update/profile")
-    public ResponseEntity<String> updateProfile(@AuthenticationPrincipal UserDetails userDetails,
+    public ResponseEntity<MessageResponse> updateProfile(@AuthenticationPrincipal UserDetails userDetails,
                                                  @Valid @ModelAttribute UpdateProfileRequest request){
-        String result = memberService.updateProfile(userDetails.getUsername(), request);
+        MessageResponse result = memberService.updateProfile(userDetails.getUsername(), request);
         return ResponseEntity.ok(result);
     }
 
