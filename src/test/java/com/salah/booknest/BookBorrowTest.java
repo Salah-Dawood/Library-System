@@ -50,6 +50,8 @@ public class BookBorrowTest {
     @Mock private UserRepository userRepository;
     @Mock private BookRepository bookRepository;
     @Mock private InventoryRepository inventoryRepository;
+    @Mock private AuditLogService auditLogService;
+    @Mock private NotificationService notificationService;
 
     @InjectMocks
     private LoanService loanService;
@@ -179,7 +181,7 @@ public class BookBorrowTest {
         loanService.returnLoan(100L, otherMemberAuth);
     }
 
-    // ------------------------------------------------------------ helpers
+    // helpers
 
     private User user(Long id, String username) {
         User u = new User();
