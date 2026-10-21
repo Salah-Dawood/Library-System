@@ -1,14 +1,18 @@
 package com.salah.booknest.service;
 
+import com.salah.booknest.exception.InvalidRequestException;
 import com.salah.booknest.model.User;
 import com.salah.booknest.model.request.AuditTriggerInfo;
 import com.salah.booknest.model.response.AuditLogResponse;
 import com.salah.booknest.repository.AuditLogRepository;
 import com.salah.booknest.repository.UserRepository;
 import com.salah.booknest.service.auditchannels.AuditChannel;
+import com.salah.booknest.util.PageUtils;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -19,6 +23,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 
 @Service
@@ -26,6 +31,7 @@ import java.util.List;
 public class AuditLogService {
 
     private static final Logger AUDIT = LoggerFactory.getLogger("AUDIT LOG");
+    private static final Set<String> SORTABLE_FIELDS = Set.of("id", "timestamp", "type", "userId", "action");
 
     private final List<AuditChannel> channels;
     private final AuditLogRepository auditLogRepository;
@@ -66,10 +72,17 @@ public class AuditLogService {
         afterCommit(() -> AUDIT.info(readableLog));
     }
 
+    /**
+     * Returns one page of audit entries, optionally filtered by type and/or acting user.
+     * Page size is limited to 100.
+     *
+     * @throws InvalidRequestException if sortBy is not an allowed field
+     */
     @Transactional(readOnly = true)
-    public List<AuditLogResponse> getAuditLogs(String type, Long userId) {
-        return auditLogRepository.search(type == null ? null : type.toUpperCase(), userId).stream()
-                .map(AuditLogResponse::from).toList();
+    public Page<AuditLogResponse> getAuditLogs(String type, Long userId, int page, int size, String sortBy, String sortDir) {
+        Pageable pageable = PageUtils.pageable(page, size, sortBy, sortDir, SORTABLE_FIELDS);
+        return auditLogRepository.search(type == null ? null : type.toUpperCase(), userId, pageable)
+                .map(AuditLogResponse::from);
     }
 
     private Long currentUserId() {
