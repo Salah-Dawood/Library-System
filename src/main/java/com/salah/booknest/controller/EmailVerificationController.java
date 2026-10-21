@@ -52,9 +52,8 @@ public class EmailVerificationController {
         return emailVerificationService.verifyEmail(username,code);
     }
 
-    @Operation(summary = "Send a password-reset email", description = "Emails a link to the password-reset page, valid for a short time. Public: no token needed.")
+    @Operation(summary = "Send a password-reset email", description = "Emails a link to the password-reset page, valid for a short time. Always returns the same response, whether or not the username exists. Public: no token needed.")
     @ApiResponses({
-            @ApiResponse(responseCode = "404", description = "Username not found"),
             @ApiResponse(responseCode = "429", description = "Too many requests")
     })
     @io.swagger.v3.oas.annotations.parameters.RequestBody(content = @Content(mediaType = "application/json",
@@ -62,6 +61,6 @@ public class EmailVerificationController {
     @PutMapping("/forgotpassword")
     public String sendResetEmail(@Valid @RequestBody UsernameRequest request){
         emailVerificationService.sendResetEmail(request);
-        return "reset should be sent by now";
+        return "If that account exists, a reset email has been sent.";
     }
 }

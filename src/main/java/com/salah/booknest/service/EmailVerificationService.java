@@ -8,6 +8,7 @@ import com.salah.booknest.repository.UserRepository;
 import com.salah.booknest.security.JWTUtils;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -18,7 +19,9 @@ import org.thymeleaf.context.Context;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.util.Optional;
 
+@Slf4j
 @Service
 public class EmailVerificationService {
 
@@ -120,20 +123,32 @@ public class EmailVerificationService {
         return true;
     }
 
+    /**
+     * Never reveals whether the username exists: an unknown username (or a mail failure) is only
+     * logged, so the caller always gets the same response.
+     */
     public void sendResetEmail(UsernameRequest request) {
-        User user = userRepository.findUserByUsername(request.getUsername())
-                .orElseThrow(() -> new InformationNotFoundException("Username " + request.getUsername() + " not found"));
+        Optional<User> found = userRepository.findUserByUsername(request.getUsername());
+        if (found.isEmpty()) {
+            log.debug("Password reset requested for an unknown username");
+            return;
+        }
+        User user = found.get();
 
-        String token = jwtUtils.generatePasswordResetToken(request.getUsername());
-        String resetUrl = ngrokUrl + "/#/reset?token=" + token;
-        String subject = "BookNest - Password Reset";
+        try {
+            String token = jwtUtils.generatePasswordResetToken(request.getUsername());
+            String resetUrl = ngrokUrl + "/#/reset?token=" + token;
+            String subject = "BookNest - Password Reset";
 
-        Context context = new Context();
-        context.setVariable("resetUrl", resetUrl);
-        context.setVariable("Gif", gifUrl);
+            Context context = new Context();
+            context.setVariable("resetUrl", resetUrl);
+            context.setVariable("Gif", gifUrl);
 
-        String htmlContent = templateEngine.process("forgot-password", context);
+            String htmlContent = templateEngine.process("forgot-password", context);
 
-        sendEmail(user.getEmailAddress(), subject, htmlContent);
+            sendEmail(user.getEmailAddress(), subject, htmlContent);
+        } catch (RuntimeException e) {
+            log.error("Could not send the password reset email", e);
+        }
     }
 }
