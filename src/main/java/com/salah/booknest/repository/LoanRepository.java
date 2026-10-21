@@ -3,6 +3,8 @@ package com.salah.booknest.repository;
 import com.salah.booknest.model.Loan;
 import com.salah.booknest.model.LoanStatus;
 import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -14,11 +16,9 @@ import java.util.Optional;
 
 public interface LoanRepository extends JpaRepository<Loan, Long> {
 
-    List<Loan> findAllByOrderByCreatedAtDesc();
+    Page<Loan> findAllByStatus(LoanStatus status, Pageable pageable);
 
-    List<Loan> findAllByStatusOrderByCreatedAtDesc(LoanStatus status);
-
-    List<Loan> findAllByUserIdOrderByCreatedAtDesc(Long userId);
+    Page<Loan> findAllByUserId(Long userId, Pageable pageable);
 
     List<Loan> findAllByUserIdAndStatus(Long userId, LoanStatus status);
 

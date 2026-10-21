@@ -19,7 +19,10 @@ import com.salah.booknest.repository.InventoryRepository;
 import com.salah.booknest.repository.LoanRepository;
 import com.salah.booknest.repository.UserRepository;
 import com.salah.booknest.security.Roles;
+import com.salah.booknest.util.PageUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -30,6 +33,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -40,6 +44,8 @@ public class LoanService {
     private static final int MIN_RETURNS_FOR_BADGE = 3;
     private static final int RELIABLE_RATE_PERCENT = 90;
     private static final List<LoanStatus> ACTIVE_STATUSES = List.of(LoanStatus.REQUESTED, LoanStatus.APPROVED);
+    private static final Set<String> SORTABLE_FIELDS =
+            Set.of("id", "createdAt", "loanDate", "dueDate", "returnDate", "status");
 
     private final LoanRepository loanRepository;
     private final UserRepository userRepository;
@@ -49,23 +55,30 @@ public class LoanService {
     private final AuditLogService auditLogService;
 
 
+    /**
+     * Returns one page of all loans, optionally only those with the given status.
+     * Page size is limited to 100.
+     *
+     * @throws InvalidRequestException if sortBy is not an allowed field
+     */
     @Transactional(readOnly = true)
-    public List<LoanResponse> getLoans(LoanStatus status) {
-        List<Loan> loans = status == null
-                ? loanRepository.findAllByOrderByCreatedAtDesc()
-                : loanRepository.findAllByStatusOrderByCreatedAtDesc(status);
-        return loans.stream().map(LoanResponse::from).toList();
+    public Page<LoanResponse> getLoans(LoanStatus status, int page, int size, String sortBy, String sortDir) {
+        Pageable pageable = PageUtils.pageable(page, size, sortBy, sortDir, SORTABLE_FIELDS);
+        Page<Loan> loans = status == null
+                ? loanRepository.findAll(pageable)
+                : loanRepository.findAllByStatus(status, pageable);
+        return loans.map(LoanResponse::from);
     }
 
     @Transactional(readOnly = true)
-    public List<LoanResponse> getMyLoans(Authentication authentication) {
-        return getByUserId(getUserFromAuth(authentication).getId());
+    public Page<LoanResponse> getMyLoans(Authentication authentication, int page, int size, String sortBy, String sortDir) {
+        return getByUserId(getUserFromAuth(authentication).getId(), page, size, sortBy, sortDir);
     }
 
     @Transactional(readOnly = true)
-    public List<LoanResponse> getByUserId(Long userId) {
-        return loanRepository.findAllByUserIdOrderByCreatedAtDesc(userId).stream()
-                .map(LoanResponse::from).toList();
+    public Page<LoanResponse> getByUserId(Long userId, int page, int size, String sortBy, String sortDir) {
+        Pageable pageable = PageUtils.pageable(page, size, sortBy, sortDir, SORTABLE_FIELDS);
+        return loanRepository.findAllByUserId(userId, pageable).map(LoanResponse::from);
     }
 
     //workflow

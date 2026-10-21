@@ -16,13 +16,12 @@ import com.salah.booknest.model.response.ReturnStats;
 import com.salah.booknest.service.LoanService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @Tag(name = "Loans", description = "Members request books and return them; librarians approve or reject requests.")
 @RestController
@@ -32,27 +31,48 @@ public class LoanController {
 
     private final LoanService loanService;
 
-    @Operation(summary = "List all loans", description = "Newest first. Filter with ?status=REQUESTED, APPROVED, REJECTED, CANCELLED or RETURNED. Librarian only.")
+    @Operation(summary = "List all loans (paged)", description = "Newest first by default. Filter with ?status=REQUESTED, APPROVED, REJECTED, CANCELLED or RETURNED. Sort by id, createdAt, loanDate, dueDate, returnDate or status. Page size is capped at 100. Librarian only.")
     @ApiResponses({
-            @ApiResponse(responseCode = "400", description = "Unknown status")
+            @ApiResponse(responseCode = "400", description = "Unknown status or sortBy field")
     })
     @GetMapping
     @PreAuthorize("hasRole('librarian')")
-    public List<LoanResponse> getLoans(@Parameter(description = "REQUESTED, APPROVED, REJECTED, CANCELLED or RETURNED") @RequestParam(required = false) LoanStatus status) {
-        return loanService.getLoans(status);
+    public Page<LoanResponse> getLoans(
+            @Parameter(description = "REQUESTED, APPROVED, REJECTED, CANCELLED or RETURNED") @RequestParam(required = false) LoanStatus status,
+            @Parameter(description = "Page number, starting at 0") @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Loans per page (1 to 100)") @RequestParam(defaultValue = "10") int size,
+            @Parameter(description = "id, createdAt, loanDate, dueDate, returnDate or status") @RequestParam(defaultValue = "createdAt") String sortBy,
+            @Parameter(description = "asc or desc") @RequestParam(defaultValue = "desc") String sortDir) {
+        return loanService.getLoans(status, page, size, sortBy, sortDir);
     }
 
-    @Operation(summary = "List my loans", description = "Loans of the logged-in user, newest first. Includes return timing (early, on time, late) and an overdue flag.")
+    @Operation(summary = "List my loans (paged)", description = "Loans of the logged-in user, newest first by default. Includes return timing (early, on time, late) and an overdue flag. Same paging and sorting as the full list.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "400", description = "Unknown sortBy field")
+    })
     @GetMapping("/my-loans")
-    public List<LoanResponse> getMyLoans(Authentication authentication) {
-        return loanService.getMyLoans(authentication);
+    public Page<LoanResponse> getMyLoans(
+            Authentication authentication,
+            @Parameter(description = "Page number, starting at 0") @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Loans per page (1 to 100)") @RequestParam(defaultValue = "10") int size,
+            @Parameter(description = "id, createdAt, loanDate, dueDate, returnDate or status") @RequestParam(defaultValue = "createdAt") String sortBy,
+            @Parameter(description = "asc or desc") @RequestParam(defaultValue = "desc") String sortDir) {
+        return loanService.getMyLoans(authentication, page, size, sortBy, sortDir);
     }
 
-    @Operation(summary = "List a user's loans", description = "Newest first. Librarian only.")
+    @Operation(summary = "List a user's loans (paged)", description = "Newest first by default. Same paging and sorting as the full list. Librarian only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "400", description = "Unknown sortBy field")
+    })
     @GetMapping("/user/{userId}")
     @PreAuthorize("hasRole('librarian')")
-    public List<LoanResponse> getByUserId(@Parameter(description = "Id of the user") @PathVariable Long userId) {
-        return loanService.getByUserId(userId);
+    public Page<LoanResponse> getByUserId(
+            @Parameter(description = "Id of the user") @PathVariable Long userId,
+            @Parameter(description = "Page number, starting at 0") @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Loans per page (1 to 100)") @RequestParam(defaultValue = "10") int size,
+            @Parameter(description = "id, createdAt, loanDate, dueDate, returnDate or status") @RequestParam(defaultValue = "createdAt") String sortBy,
+            @Parameter(description = "asc or desc") @RequestParam(defaultValue = "desc") String sortDir) {
+        return loanService.getByUserId(userId, page, size, sortBy, sortDir);
     }
 
     @Operation(summary = "My return history", description = "Counts of early, on-time and late returns, and the Reliable member badge (at least 3 returns, 90% on time or early).")
