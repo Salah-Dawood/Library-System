@@ -9,12 +9,10 @@ import com.salah.booknest.model.response.LoginResponse;
 import com.salah.booknest.model.response.UserDetailResponse;
 import com.salah.booknest.service.LibrarianService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
+import org.springframework.data.domain.Page;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @Tag(name = "User administration", description = "Librarian only: list, inspect, activate, deactivate and delete users.")
 @RestController
@@ -34,10 +32,17 @@ public class LibrarianController {
         return librarianService.getUserDetail(userId);
     }
 
-    @Operation(summary = "List users", description = "Summary of every account. Librarian only.")
+    @Operation(summary = "List users (paged)", description = "Summary of every account, ordered by id by default. Sort by id, username, emailAddress, role or createdAt. Page size is capped at 100. Librarian only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "400", description = "Unknown sortBy field")
+    })
     @GetMapping("/users")
-    public List<LoginResponse.UserSummary> getUsers() {
-        return librarianService.getUsers();
+    public Page<LoginResponse.UserSummary> getUsers(
+            @Parameter(description = "Page number, starting at 0") @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Users per page (1 to 100)") @RequestParam(defaultValue = "10") int size,
+            @Parameter(description = "id, username, emailAddress, role or createdAt") @RequestParam(defaultValue = "id") String sortBy,
+            @Parameter(description = "asc or desc") @RequestParam(defaultValue = "asc") String sortDir) {
+        return librarianService.getUsers(page, size, sortBy, sortDir);
     }
 
 

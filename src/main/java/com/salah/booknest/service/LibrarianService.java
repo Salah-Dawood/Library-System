@@ -1,21 +1,27 @@
 package com.salah.booknest.service;
 
 import com.salah.booknest.exception.InformationNotFoundException;
+import com.salah.booknest.exception.InvalidRequestException;
 import com.salah.booknest.exception.InvalidStateException;
 import com.salah.booknest.model.User;
 import com.salah.booknest.model.response.LoginResponse;
 import com.salah.booknest.model.response.UserDetailResponse;
 import com.salah.booknest.repository.UserRepository;
+import com.salah.booknest.util.PageUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
+import java.util.Set;
 
 
 @Service
 @RequiredArgsConstructor
 public class LibrarianService {
+
+    private static final Set<String> SORTABLE_FIELDS = Set.of("id", "username", "emailAddress", "role", "createdAt");
 
     private final UserRepository userRepository;
     private final AuditLogService auditLogService;
@@ -27,8 +33,15 @@ public class LibrarianService {
         return UserDetailResponse.from(user);
     }
 
-    public List<LoginResponse.UserSummary> getUsers() {
-        return userRepository.findAll().stream().map(this::toSummary).toList();
+    /**
+     * Returns one page of user summaries. Page size is limited to 100.
+     *
+     * @throws InvalidRequestException if sortBy is not an allowed field
+     */
+    @Transactional(readOnly = true)
+    public Page<LoginResponse.UserSummary> getUsers(int page, int size, String sortBy, String sortDir) {
+        Pageable pageable = PageUtils.pageable(page, size, sortBy, sortDir, SORTABLE_FIELDS);
+        return userRepository.findAll(pageable).map(this::toSummary);
     }
 
     @Transactional
