@@ -9,6 +9,7 @@ import com.salah.booknest.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
@@ -18,6 +19,7 @@ import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Component
+@Order(1)
 @RequiredArgsConstructor
 public class DatabaseSeeder implements CommandLineRunner {
 
