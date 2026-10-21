@@ -39,8 +39,9 @@ public class MemberController {
         return ResponseEntity.ok(result);
     }
 
-    @Operation(summary = "Update my profile", description = "Multipart form with any of: firstName, lastName, bio, age, image (a file). Only the fields you send are changed. Returns a JSON message.")
+    @Operation(summary = "Update my profile", description = "Multipart form with any of: firstName, lastName, bio, age, image (a JPEG, PNG or GIF file). Only the fields you send are changed. Returns a JSON message.")
     @ApiResponses({
+            @ApiResponse(responseCode = "400", description = "The image is not a valid JPEG, PNG or GIF"),
             @ApiResponse(responseCode = "413", description = "Image is too large")
     })
     @PutMapping("/update/profile")

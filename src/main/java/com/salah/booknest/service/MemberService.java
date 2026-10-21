@@ -12,16 +12,23 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Iterator;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
 public class MemberService {
 
     private final String PROFILE_DIR = "profile/";
+    private static final Set<String> ALLOWED_IMAGE_TYPES = Set.of("image/jpeg", "image/png", "image/gif");
+    private static final int MAX_IMAGE_SIDE_PX = 5000;
 
 
     @Autowired
@@ -73,7 +80,7 @@ public class MemberService {
         if (request.getAge() != null) {
             profile.setAge(request.getAge());
         }
-        if (request.getImage() != null) {
+        if (request.getImage() != null && !request.getImage().isEmpty()) {
             profile.setImageUrl(uploadImage(request.getImage()));
         }
 
@@ -84,6 +91,22 @@ public class MemberService {
 
     //used to upload image and return URL
     public String uploadImage(MultipartFile image){
+        if (image.isEmpty()) {
+            throw new InvalidRequestException("Image file is empty");
+        }
+
+        // 1. The declared type must be an allowed image type
+        String declaredType = image.getContentType();
+        if (declaredType == null || !ALLOWED_IMAGE_TYPES.contains(declaredType.toLowerCase())) {
+            throw new InvalidRequestException("Only JPEG, PNG and GIF images are allowed");
+        }
+
+        // 2. The real content must be one of those image types (the declared type can be faked)
+        String extension = detectImageExtension(image);
+        if (extension == null) {
+            throw new InvalidRequestException("The file is not a valid JPEG, PNG or GIF image");
+        }
+
         try {
             Path uploadPath = Paths.get(PROFILE_DIR);
 
@@ -91,12 +114,9 @@ public class MemberService {
                 Files.createDirectories(uploadPath);
             }
 
-            String originalFileName = image.getOriginalFilename();
-
-            //generate unique id
-            String uniqueId = UUID.randomUUID().toString();
-
-            String fileName = uniqueId + "_" + originalFileName;
+            // The client's filename is never used: the name is generated and the extension
+            // comes from the detected content type
+            String fileName = UUID.randomUUID() + "." + extension;
 
             // Create file path
             Path filePath = uploadPath.resolve(fileName);
@@ -109,6 +129,42 @@ public class MemberService {
 
         } catch (IOException e) {
             throw new RuntimeException("Could not save image", e);
+        }
+    }
+
+    /**
+     * Looks at the file's content (not its name or declared type) and returns "jpg", "png" or "gif",
+     * or null if it is not a valid image of one of those types.
+     */
+    private String detectImageExtension(MultipartFile image) {
+        try (ImageInputStream in = ImageIO.createImageInputStream(image.getInputStream())) {
+            if (in == null) {
+                return null;
+            }
+            Iterator<ImageReader> readers = ImageIO.getImageReaders(in);
+            if (!readers.hasNext()) {
+                return null;
+            }
+            ImageReader reader = readers.next();
+            try {
+                reader.setInput(in);
+                // Reading the size also checks that the image header is valid
+                int width = reader.getWidth(0);
+                int height = reader.getHeight(0);
+                if (width <= 0 || height <= 0 || width > MAX_IMAGE_SIDE_PX || height > MAX_IMAGE_SIDE_PX) {
+                    return null;
+                }
+                return switch (reader.getFormatName().toLowerCase()) {
+                    case "jpeg" -> "jpg";
+                    case "png" -> "png";
+                    case "gif" -> "gif";
+                    default -> null;
+                };
+            } finally {
+                reader.dispose();
+            }
+        } catch (IOException | RuntimeException e) {
+            return null;
         }
     }
 
