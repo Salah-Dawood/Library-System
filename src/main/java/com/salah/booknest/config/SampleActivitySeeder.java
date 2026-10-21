@@ -5,9 +5,11 @@ import com.salah.booknest.model.Book;
 import com.salah.booknest.model.Inventory;
 import com.salah.booknest.model.Loan;
 import com.salah.booknest.model.LoanStatus;
+import com.salah.booknest.model.Review;
 import com.salah.booknest.model.User;
 import com.salah.booknest.repository.BookRepository;
 import com.salah.booknest.repository.LoanRepository;
+import com.salah.booknest.repository.ReviewRepository;
 import com.salah.booknest.repository.UserRepository;
 import com.salah.booknest.service.AuditLogService;
 import lombok.RequiredArgsConstructor;
@@ -21,33 +23,34 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
- * Adds sample loans (and their audit entries) for the users and books created by DatabaseSeeder,
+ * Adds sample loans and reviews (and their audit entries) for the users and books created by DatabaseSeeder,
  * so the whole workflow can be shown straight after startup.
  * Dates are relative to today, so "overdue" or "early" are always true when the app is started.
  */
 @Component
-@Order(2) // runs after DatabaseSeeder
+@Order(2) // runs after DatabaseSeeder (@Order(1)) has created the users and books
 @RequiredArgsConstructor
 public class SampleActivitySeeder implements CommandLineRunner {
 
     private final UserRepository userRepository;
     private final BookRepository bookRepository;
     private final LoanRepository loanRepository;
+    private final ReviewRepository reviewRepository;
     private final AuditLogService auditLogService;
     private final PlatformTransactionManager transactionManager;
 
     @Override
     public void run(String... args) {
-        if (loanRepository.count() > 0) {
-            System.out.println("Loans already exist. Skipping sample loans.");
+        if (loanRepository.count() > 0 || reviewRepository.count() > 0) {
+            System.out.println("Loans or reviews already exist. Skipping sample loans and reviews.");
             return;
         }
         try {
             // One transaction for everything: if a sample user or book is missing, nothing is saved
             new TransactionTemplate(transactionManager).executeWithoutResult(status -> seedSampleActivity());
-            System.out.println("Sample loans successfully seeded!");
+            System.out.println("Sample loans and reviews successfully seeded!");
         } catch (InformationNotFoundException e) {
-            System.out.println("Skipping sample loans: " + e.getMessage());
+            System.out.println("Skipping sample loans and reviews: " + e.getMessage());
         }
     }
 
@@ -96,6 +99,15 @@ public class SampleActivitySeeder implements CommandLineRunner {
         approved(librarian, alex, allQuiet, 10, 2);
         requested(alex, fellowship, 21);
         cancelled(alex, noneLeft, 7);
+
+        // Reviews. Only members who returned a book can review it (see ReviewService), so every review
+        // below matches a returned loan above. johnd returned "Dune" but has not reviewed it yet, so
+        // the "write a review" step can still be shown live.
+        review(john, nineteen84, 9, "Chilling and still painfully relevant. Hard to put down.");
+        review(john, hobbit, 8, "A cozy adventure with great pacing.");
+        review(alex, hobbit, 9, "The perfect way into Middle-earth.");
+        review(jane, animalFarm, 7, "Short, sharp and surprisingly funny in places.");
+        review(jane, mockingbird, 10, "A moving story with unforgettable characters.");
     }
 
     // ---- loan states ----
@@ -147,6 +159,19 @@ public class SampleActivitySeeder implements CommandLineRunner {
 
         audit("LOAN", member, "REQUESTED", loan.getId());
         audit("LOAN", member, "CANCELLED", loan.getId());
+    }
+
+    // ---- reviews ----
+
+    private void review(User member, Book book, int rating, String comment) {
+        Review review = new Review();
+        review.setUser(member);
+        review.setBook(book);
+        review.setRating(rating);
+        review.setComment(comment);
+        review = reviewRepository.save(review);
+
+        audit("REVIEW", member, "CREATED", review.getId());
     }
 
     // ---- helpers ----
