@@ -11,7 +11,7 @@ import java.util.Set;
 
 @AllArgsConstructor
 @NoArgsConstructor
-@ToString
+@ToString(exclude = "books")
 @Getter
 @Setter
 @Entity

@@ -48,7 +48,7 @@ class SecurityAndLoginTest {
         emailVerificationService = mock(EmailVerificationService.class);
         auditLogService = mock(AuditLogService.class);
         userService = new UserService(userRepository, passwordEncoder, jwtUtils,
-                authenticationManager, null, emailVerificationService, auditLogService);
+                authenticationManager, auditLogService);
     }
 
     @Test

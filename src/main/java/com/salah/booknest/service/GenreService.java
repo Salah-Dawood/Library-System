@@ -7,8 +7,6 @@ import com.salah.booknest.model.Genre;
 import com.salah.booknest.model.request.GenreRequest;
 import com.salah.booknest.model.response.GenreResponse;
 import com.salah.booknest.repository.GenreRepository;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,7 +37,7 @@ public class GenreService {
     }
 
     //create genre
-    public ResponseEntity<?> createGenre(GenreRequest request){
+    public GenreResponse createGenre(GenreRequest request){
         genreRepository.findByName(request.getName())
                 .ifPresent(existingGenre -> {
                     throw new InformationExistException("Genre with name " + request.getName() + " already exists");
@@ -49,10 +47,10 @@ public class GenreService {
         genre.setName(request.getName());
         genre.setDescription(request.getDescription());
         Genre savedGenre = genreRepository.save(genre);
-        return new ResponseEntity<>(GenreResponse.from(savedGenre), HttpStatus.CREATED);
+        return GenreResponse.from(savedGenre);
     }
 
-    public ResponseEntity<?> updateGenre(Long genreId, GenreRequest request) {
+    public GenreResponse updateGenre(Long genreId, GenreRequest request) {
         Genre genre = genreRepository.findById(genreId)
                 .orElseThrow(() -> new InformationNotFoundException("Genre with ID " + genreId + " not found"));
         if (request.getName() != null) {
@@ -66,11 +64,11 @@ public class GenreService {
         if (request.getDescription() != null) {
             genre.setDescription(request.getDescription());
         }
-        return new ResponseEntity<>(GenreResponse.from(genreRepository.save(genre)), HttpStatus.OK);
+        return GenreResponse.from(genreRepository.save(genre));
     }
 
     @Transactional
-    public ResponseEntity<?> deleteGenre(Long genreId) {
+    public void deleteGenre(Long genreId) {
         Genre genre = genreRepository.findById(genreId)
                 .orElseThrow(() -> new InformationNotFoundException("Genre with ID " + genreId + " not found"));
         if (!genre.getBooks().isEmpty()) {
@@ -78,6 +76,5 @@ public class GenreService {
                     "Genre \"" + genre.getName() + "\" is still used by " + genre.getBooks().size() + " book(s)");
         }
         genreRepository.delete(genre);
-        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
 }

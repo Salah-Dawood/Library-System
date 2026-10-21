@@ -22,8 +22,6 @@ import jakarta.persistence.criteria.Join;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -133,7 +131,7 @@ public class BookService {
 
     //create book
     @Transactional
-    public ResponseEntity<?> createBook(CreateBookRequest request) {
+    public BookResponse createBook(CreateBookRequest request) {
         if (request.getTotalCopies() == null || request.getTotalCopies() < 0) {
             throw new InvalidRequestException("Total copies must be zero or more");
         }
@@ -178,7 +176,7 @@ public class BookService {
         Book savedBook = bookRepository.save(book);
         auditLogService.log("BOOK", "CREATED", savedBook.getId());
 
-        return new ResponseEntity<>(bookResponser(savedBook), HttpStatus.CREATED);
+        return bookResponser(savedBook);
     }
 
     /**
@@ -188,7 +186,7 @@ public class BookService {
      * @throws InformationExistException if the ISBN already belongs to another book
      */
     @Transactional
-    public ResponseEntity<?> updateBook(Long bookId, CreateBookRequest request) {
+    public BookResponse updateBook(Long bookId, CreateBookRequest request) {
         Book book = bookRepository.findById(bookId)
                 .orElseThrow(() -> new InformationNotFoundException("Book with ID " + bookId + " not found"));
 
@@ -223,7 +221,7 @@ public class BookService {
         }
         Book saved = bookRepository.save(book);
         auditLogService.log("BOOK", "UPDATED", saved.getId());
-        return new ResponseEntity<>(bookResponser(saved), HttpStatus.OK);
+        return bookResponser(saved);
     }
 
     /**
@@ -231,12 +229,12 @@ public class BookService {
      * A book cannot be deactivated while it has a requested or approved loan.
      */
     @Transactional
-    public ResponseEntity<?> deleteBook(Long bookId) {
+    public void deleteBook(Long bookId) {
         Book book = bookRepository.findById(bookId)
                 .orElseThrow(() -> new InformationNotFoundException("Book with ID " + bookId + " not found"));
 
         if (Boolean.FALSE.equals(book.getActive())) {
-            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+            return;
         }
 
         boolean hasActiveLoans = loanRepository.existsByBookIdAndStatusIn(
@@ -247,7 +245,6 @@ public class BookService {
 
         book.setActive(false);
         auditLogService.log("BOOK", "DEACTIVATED", bookId);
-        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
 
 

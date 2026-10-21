@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import com.salah.booknest.model.response.AuthorResponse;
 import com.salah.booknest.service.AuthorService;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -61,8 +62,8 @@ public class AuthorController {
             examples = @ExampleObject(value = "{\"name\":\"Frank Herbert\",\"birthYear\":1920,\"nationality\":\"American\"}")))
     @PostMapping("")
     @PreAuthorize("hasRole('librarian')")
-    public ResponseEntity<?> createAuthor(@Valid @RequestBody AuthorRequest request){
-        return authorService.createAuthor(request);
+    public ResponseEntity<AuthorResponse> createAuthor(@Valid @RequestBody AuthorRequest request){
+        return new ResponseEntity<>(authorService.createAuthor(request), HttpStatus.CREATED);
     }
 
     @Operation(summary = "Edit an author", description = "Only the fields you send are changed. An author can keep their own name. Librarian only.")
@@ -75,9 +76,9 @@ public class AuthorController {
             examples = @ExampleObject(value = "{\"name\":\"Frank Herbert\",\"birthYear\":1920,\"nationality\":\"American\"}")))
     @PutMapping("/{authorId}")
     @PreAuthorize("hasRole('librarian')")
-    public ResponseEntity<?> updateAuthor(@Parameter(description = "Id of the author") @PathVariable Long authorId,
-                                          @Valid @RequestBody AuthorRequest request){
-        return authorService.updateAuthor(authorId,request);
+    public ResponseEntity<AuthorResponse> updateAuthor(@Parameter(description = "Id of the author") @PathVariable Long authorId,
+                                                       @Valid @RequestBody AuthorRequest request){
+        return new ResponseEntity<>(authorService.updateAuthor(authorId,request), HttpStatus.OK);
     }
 
     @Operation(summary = "Delete an author", description = "Deactivates the author while preserving related records. Librarian only.")
@@ -87,8 +88,9 @@ public class AuthorController {
     })
     @DeleteMapping("/{authorId}")
     @PreAuthorize("hasRole('librarian')")
-    public ResponseEntity<?> deleteAuthor(@Parameter(description = "Id of the author") @PathVariable Long authorId){
-        return authorService.deleteAuthor(authorId);
+    public ResponseEntity<Void> deleteAuthor(@Parameter(description = "Id of the author") @PathVariable Long authorId){
+        authorService.deleteAuthor(authorId);
+        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
 
 }

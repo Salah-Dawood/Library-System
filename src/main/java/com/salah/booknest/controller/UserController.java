@@ -52,8 +52,8 @@ public class UserController {
     @io.swagger.v3.oas.annotations.parameters.RequestBody(content = @Content(mediaType = "application/json",
             examples = @ExampleObject(value = "{\"username\":\"john\",\"password\":\"Passw0rd!\"}")))
     @PostMapping("/login")
-    public ResponseEntity<?> loginUser(@Valid @RequestBody LoginRequest loginRequest){
-        return userService.loginUser(loginRequest);
+    public ResponseEntity<LoginResponse> loginUser(@Valid @RequestBody LoginRequest loginRequest){
+        return new ResponseEntity<>(userService.loginUser(loginRequest), HttpStatus.OK);
     }
 
     @Operation(summary = "Set a new password with a reset token", description = "The token comes from the email link and only works for password reset, not as a login token. Returns a JSON message. Public: no token needed.")
@@ -67,6 +67,6 @@ public class UserController {
     public ResponseEntity<MessageResponse> executePasswordReset(
             @Parameter(description = "Password-reset token from the email link") @PathVariable("token") String token,
             @Valid@RequestBody ChangePasswordRequest changePasswordRequest) {
-        return userService.executePasswordReset(token, changePasswordRequest.getNewPassword());
+        return new ResponseEntity<>(userService.executePasswordReset(token, changePasswordRequest.getNewPassword()), HttpStatus.OK);
     }
 }

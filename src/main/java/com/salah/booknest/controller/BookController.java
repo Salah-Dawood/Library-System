@@ -13,6 +13,7 @@ import com.salah.booknest.model.response.BookResponse;
 import com.salah.booknest.service.BookService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -78,8 +79,8 @@ public class BookController {
             examples = @ExampleObject(value = "{\"title\":\"Dune\",\"isbn\":\"978-0441013593\",\"publishedYear\":1965,\"authorId\":1,\"totalCopies\":3,\"genreIds\":[1,2]}")))
     @PostMapping("")
     @PreAuthorize("hasRole('librarian')")
-    public ResponseEntity<?> createBook(@Valid @RequestBody CreateBookRequest request){
-        return bookService.createBook(request);
+    public ResponseEntity<BookResponse> createBook(@Valid @RequestBody CreateBookRequest request){
+        return new ResponseEntity<>(bookService.createBook(request), HttpStatus.CREATED);
     }
 
     @Operation(summary = "Edit a book", description = "Only the fields you send are changed. Changing totalCopies keeps the number of copies on loan, and cannot go below it. Librarian only.")
@@ -92,9 +93,9 @@ public class BookController {
             examples = @ExampleObject(value = "{\"title\":\"Dune\",\"isbn\":\"978-0441013593\",\"publishedYear\":1965,\"authorId\":1,\"totalCopies\":4,\"genreIds\":[1]}")))
     @PutMapping("/{bookId}")
     @PreAuthorize("hasRole('librarian')")
-    public ResponseEntity updateBook(@Parameter(description = "Id of the book") @PathVariable Long bookId,
-                                     @Valid @RequestBody CreateBookRequest request){
-        return bookService.updateBook(bookId,request);
+    public ResponseEntity<BookResponse> updateBook(@Parameter(description = "Id of the book") @PathVariable Long bookId,
+                                                   @Valid @RequestBody CreateBookRequest request){
+        return new ResponseEntity<>(bookService.updateBook(bookId,request), HttpStatus.OK);
     }
 
     @Operation(summary = "Delete a book", description = "Also deletes its loans and reviews. Librarian only.")
@@ -104,7 +105,8 @@ public class BookController {
     })
     @DeleteMapping("/{bookId}")
     @PreAuthorize("hasRole('librarian')")
-    public ResponseEntity<?> deleteBook(@Parameter(description = "Id of the book") @PathVariable Long bookId){
-        return bookService.deleteBook(bookId);
+    public ResponseEntity<Void> deleteBook(@Parameter(description = "Id of the book") @PathVariable Long bookId){
+        bookService.deleteBook(bookId);
+        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
 }

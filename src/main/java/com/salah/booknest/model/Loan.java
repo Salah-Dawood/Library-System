@@ -57,6 +57,10 @@ public class Loan {
     @Column(name = "rejection_reason")
     private String rejectionReason;
 
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn
+    private Fine fine;
+
     @CreationTimestamp
     @Column(name = "created_at")
     private LocalDateTime createdAt;
