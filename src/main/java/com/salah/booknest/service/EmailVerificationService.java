@@ -16,10 +16,14 @@ import org.springframework.stereotype.Service;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 
-import java.util.Random;
+import java.security.SecureRandom;
+import java.time.LocalDateTime;
 
 @Service
 public class EmailVerificationService {
+
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    private static final int CODE_VALID_MINUTES = 10;
 
     private final UserRepository userRepository;
     private final JavaMailSender mailSender;
@@ -80,20 +84,21 @@ public class EmailVerificationService {
 
         Context context = new Context();
         context.setVariable("code", code);
+        context.setVariable("validMinutes", CODE_VALID_MINUTES);
         context.setVariable("Gif", gifUrl);
 
         String htmlContent = templateEngine.process("email-verification", context);
 
         user.setEmailVerificationCode(code);
+        user.setEmailVerificationCodeExpiresAt(LocalDateTime.now().plusMinutes(CODE_VALID_MINUTES));
         userRepository.save(user);
         sendEmail(email, subject, htmlContent);
     }
 
     //generate code helper method
     public int generateVerificationCode() {
-        Random random = new Random();
         // Generates a number from 0 to 8999, then adds 1000 to ensure it's always 4 digits
-        return 1000 + random.nextInt(9000);
+        return 1000 + SECURE_RANDOM.nextInt(9000);
     }
 
     public boolean verifyEmail(String username, int code) {
@@ -103,7 +108,14 @@ public class EmailVerificationService {
         if (stored == null || stored != code) {
             throw new InvalidRequestException("Incorrect verification code");
         }
+        LocalDateTime expiresAt = user.getEmailVerificationCodeExpiresAt();
+        if (expiresAt == null || LocalDateTime.now().isAfter(expiresAt)) {
+            throw new InvalidRequestException("Verification code has expired. Please request a new one");
+        }
         user.setIsVerified(true);
+        // The code can only be used once
+        user.setEmailVerificationCode(null);
+        user.setEmailVerificationCodeExpiresAt(null);
         userRepository.save(user);
         return true;
     }

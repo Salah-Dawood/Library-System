@@ -50,6 +50,9 @@ public class User {
     private Integer emailVerificationCode;
 
     @Column
+    private LocalDateTime emailVerificationCodeExpiresAt;
+
+    @Column
     @CreationTimestamp
     private LocalDateTime createdAt;
 
