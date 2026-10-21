@@ -1,6 +1,7 @@
 package com.salah.booknest.service;
 
 import com.salah.booknest.exception.InformationNotFoundException;
+import com.salah.booknest.exception.InvalidRequestException;
 import com.salah.booknest.model.User;
 import com.salah.booknest.model.UserProfile;
 import com.salah.booknest.model.request.UpdateProfileRequest;
@@ -36,11 +37,15 @@ public class MemberService {
         this.auditLogService = auditLogService;
     }
 
-    public MessageResponse changePassword(String username,String password){
+    public MessageResponse changePassword(String username, String currentPassword, String newPassword){
         User user = userRepository.findUserByUsername(username)
                 .orElseThrow(() -> new InformationNotFoundException("Username " + username + " not found"));
 
-        user.setPassword(passwordEncoder.encode(password));
+        if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
+            throw new InvalidRequestException("Current password is incorrect");
+        }
+
+        user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
         auditLogService.logAs("USER", user.getId(), "PASSWORD_CHANGED", user.getId());
         return new MessageResponse("Password changed successfully");

@@ -7,7 +7,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.salah.booknest.model.UserProfile;
-import com.salah.booknest.model.request.ChangePasswordRequest;
+import com.salah.booknest.model.request.UpdatePasswordRequest;
 import com.salah.booknest.model.request.UpdateProfileRequest;
 import com.salah.booknest.model.response.MessageResponse;
 import com.salah.booknest.service.MemberService;
@@ -25,13 +25,17 @@ import org.springframework.web.bind.annotation.*;
 public class MemberController {
     private final MemberService memberService;
 
-    @Operation(summary = "Change my password", description = "Changes the password of the logged-in user.")
+    @Operation(summary = "Change my password", description = "Changes the password of the logged-in user. The current password must be sent and must be correct.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "400", description = "The current password is incorrect")
+    })
     @io.swagger.v3.oas.annotations.parameters.RequestBody(content = @Content(mediaType = "application/json",
-            examples = @ExampleObject(value = "{\"newPassword\":\"NewPassw0rd!\"}")))
+            examples = @ExampleObject(value = "{\"currentPassword\":\"OldPassw0rd!\",\"newPassword\":\"NewPassw0rd!\"}")))
     @PutMapping("/change-password")
     public ResponseEntity<MessageResponse> changePassword(@AuthenticationPrincipal UserDetails userDetails,
-                                                 @Valid @RequestBody ChangePasswordRequest request){
-        MessageResponse result = memberService.changePassword(userDetails.getUsername(), request.getNewPassword());
+                                                 @Valid @RequestBody UpdatePasswordRequest request){
+        MessageResponse result = memberService.changePassword(userDetails.getUsername(),
+                request.getCurrentPassword(), request.getNewPassword());
         return ResponseEntity.ok(result);
     }
 
