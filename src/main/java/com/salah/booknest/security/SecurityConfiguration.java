@@ -20,6 +20,7 @@ public class SecurityConfiguration {
 
     private final JwtRequestFilter jwtRequestFilter;
     private final AuthRateLimitFilter authRateLimitFilter;
+    private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
 
     @Bean
     public PasswordEncoder passwordEncoder(){
@@ -30,6 +31,7 @@ public class SecurityConfiguration {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception{
         http.csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtAuthenticationEntryPoint))
                 .authorizeHttpRequests(auth -> auth.requestMatchers(
                                 "/", "/index.html", "/favicon.ico", "/*.js", "/*.css","/*.html","/profile/**",
                                 "/static/**", "/css/**", "/js/**", "/images/**",
