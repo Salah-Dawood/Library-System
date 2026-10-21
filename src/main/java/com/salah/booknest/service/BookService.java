@@ -17,11 +17,10 @@ import com.salah.booknest.repository.GenreRepository;
 import com.salah.booknest.repository.InventoryRepository;
 import com.salah.booknest.repository.LoanRepository;
 import com.salah.booknest.repository.ReviewRepository;
+import com.salah.booknest.util.PageUtils;
 import jakarta.persistence.criteria.Join;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -91,7 +90,6 @@ public class BookService {
 
     //return all book
     private static final Set<String> SORTABLE_FIELDS = Set.of("id", "title", "publishedYear", "createdAt");
-    private static final int MAX_PAGE_SIZE = 100;
 
 
     /**
@@ -102,12 +100,7 @@ public class BookService {
      */
     @Transactional(readOnly = true)
     public Page<BookResponse> getBooks(String title, String genre, int page, int size, String sortBy, String sortDir) {
-        if (!SORTABLE_FIELDS.contains(sortBy)) {
-            throw new InvalidRequestException("Cannot sort by '" + sortBy + "'. Use one of " + SORTABLE_FIELDS);
-        }
-        Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name())
-                ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
-        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), MAX_PAGE_SIZE), sort);
+        Pageable pageable = PageUtils.pageable(page, size, sortBy, sortDir, SORTABLE_FIELDS);
 
         Specification<Book> spec = (root, query, cb) -> cb.isTrue(root.get("active"));
         if (title != null && !title.isBlank()) {
