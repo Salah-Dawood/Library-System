@@ -4,13 +4,7 @@ import com.salah.booknest.exception.InformationExistException;
 import com.salah.booknest.exception.InformationNotFoundException;
 import com.salah.booknest.exception.InvalidRequestException;
 import com.salah.booknest.exception.InvalidStateException;
-import com.salah.booknest.model.Book;
-import com.salah.booknest.model.Fine;
-import com.salah.booknest.model.Inventory;
-import com.salah.booknest.model.Loan;
-import com.salah.booknest.model.LoanStatus;
-import com.salah.booknest.model.ReturnTiming;
-import com.salah.booknest.model.User;
+import com.salah.booknest.model.*;
 import com.salah.booknest.model.request.LoanRequest;
 import com.salah.booknest.model.request.ReviewReturnRequest;
 import com.salah.booknest.model.response.LoanResponse;
@@ -24,6 +18,7 @@ import com.salah.booknest.repository.UserRepository;
 import com.salah.booknest.security.Roles;
 import com.salah.booknest.util.PageUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
@@ -185,6 +180,12 @@ public class LoanService {
 
         loan.setStatus(LoanStatus.PENDING_REVIEW);
         loan.setReturnDate(LocalDate.now());
+
+        long daysLate = ReturnTiming.daysLate(loan.getDueDate(), loan.getReturnDate());
+        BigDecimal lateFine = calculateLateFine(daysLate);
+        if (lateFine.signum() > 0) {
+            createFine(loan, FineType.LATE, lateFine, "Returned " + daysLate + " day(s) late");
+        }
 
         String timing = describeTiming(ReturnTiming.daysLate(loan.getDueDate(), loan.getReturnDate()));
         auditLogService.log("LOAN", "RETURNED", loanId);
@@ -390,5 +391,22 @@ public class LoanService {
                 action.run();
             }
         });
+    }
+
+    @Value("${app.fines.late-per-day}") private BigDecimal latePerDay;
+
+    private BigDecimal calculateLateFine(long daysLate) {
+        if (daysLate <= 0) return BigDecimal.ZERO;
+        return latePerDay.multiply(BigDecimal.valueOf(daysLate));
+    }
+
+    private void createFine(Loan loan, FineType type, BigDecimal amount, String reason) {
+        Fine fine = new Fine();
+        fine.setLoan(loan);
+        fine.setType(type);
+        fine.setAmount(amount);
+        fine.setReason(reason);
+        fineRepository.save(fine);
+        auditLogService.log("FINE", "ASSESSED", fine.getId());
     }
 }
