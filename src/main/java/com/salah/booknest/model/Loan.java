@@ -16,14 +16,14 @@ import java.util.List;
 @Setter
 @Entity
 @Table(name = "loans")
-@ToString(exclude = {"user", "book", "decidedBy"})
+@ToString(exclude = {"user", "book", "reviewedBy"})
 public class Loan {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    //request instigator
+    //the member who borrowed the book
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
@@ -34,7 +34,7 @@ public class Loan {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private LoanStatus status = LoanStatus.REQUESTED;
+    private LoanStatus status = LoanStatus.BORROWED;
 
     @Column(name = "requested_days", nullable = false)
     private Integer requestedDays;
@@ -48,18 +48,21 @@ public class Loan {
     @Column(name = "return_date")
     private LocalDate returnDate;
 
+    // Return review: filled in when a librarian inspects the returned copy
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "decided_by")
-    private User decidedBy;
+    @JoinColumn(name = "reviewed_by")
+    private User reviewedBy;
 
-    @Column(name = "decided_at")
-    private LocalDateTime decidedAt;
+    @Column(name = "reviewed_at")
+    private LocalDateTime reviewedAt;
 
-    @Column(name = "rejection_reason")
-    private String rejectionReason;
+    @Column(name = "damaged")
+    private Boolean damaged;
 
-    @OneToMany(fetch = FetchType.LAZY)
-    @JoinColumn
+    @Column(name = "review_notes", length = 500)
+    private String reviewNotes;
+
+    @OneToMany(mappedBy = "loan", fetch = FetchType.LAZY)
     private List<Fine> fines;
 
     @CreationTimestamp
@@ -69,4 +72,4 @@ public class Loan {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
-}
+}

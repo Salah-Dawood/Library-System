@@ -52,14 +52,14 @@ public class DatabaseSeeder implements CommandLineRunner {
             seedAuthor("Agatha Christie", 1890, "United Kingdom");
             seedAuthor("Frank Herbert", 1920, "USA");
 
-            // 4. Genres (Note: IDs will be assigned sequentially by your DB: 1, 2, 3, etc.)
+            // 4. Genres ( IDs will be assigned sequentially by DB: 1, 2, 3...)
             seedGenre("Dystopian", "Speculative fiction exploring social and political structures."); // ID: 1
             seedGenre("Fantasy", "Magical elements, wonder, and mythical worlds.");               // ID: 2
-            seedGenre("Fiction", "Narrative writing drawn from the imagination.");                 // ID: 3
+            seedGenre("Fiction", "Narrative writing drawn from the imagination.");                 // ID:3
             seedGenre("War", "Focuses on conflicts, military life, and political trauma.");        // ID: 4
-            seedGenre("Sci-Fi", "Futuristic settings, advanced technology, and space exploration."); // ID: 5
+            seedGenre("Sci-Fi", "Futuristic settings, advanced technology, and space exploration."); // ID:5
             seedGenre("Mystery", "Solving a crime, dealing with secrets and investigations.");     // ID: 6
-            seedGenre("Thriller", "Suspenseful, fast-paced narratives with high stakes.");         // ID: 7
+            seedGenre("Thriller", "Suspenseful, fast-paced narratives with high stakes.");         // ID:7
             seedGenre("History", "Fictional accounts set against accurate historical backdrops.");   // ID: 8
 
             // books)

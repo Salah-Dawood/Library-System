@@ -5,16 +5,19 @@ import com.salah.booknest.exception.InformationNotFoundException;
 import com.salah.booknest.exception.InvalidRequestException;
 import com.salah.booknest.exception.InvalidStateException;
 import com.salah.booknest.model.Book;
+import com.salah.booknest.model.Fine;
 import com.salah.booknest.model.Inventory;
 import com.salah.booknest.model.Loan;
 import com.salah.booknest.model.LoanStatus;
 import com.salah.booknest.model.ReturnTiming;
 import com.salah.booknest.model.User;
 import com.salah.booknest.model.request.LoanRequest;
+import com.salah.booknest.model.request.ReviewReturnRequest;
 import com.salah.booknest.model.response.LoanResponse;
 import com.salah.booknest.model.response.NotificationEvent;
 import com.salah.booknest.model.response.ReturnStats;
 import com.salah.booknest.repository.BookRepository;
+import com.salah.booknest.repository.FineRepository;
 import com.salah.booknest.repository.InventoryRepository;
 import com.salah.booknest.repository.LoanRepository;
 import com.salah.booknest.repository.UserRepository;
@@ -30,8 +33,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
@@ -43,7 +48,8 @@ public class LoanService {
     private static final int MAX_ACTIVE_LOANS = 5;
     private static final int MIN_RETURNS_FOR_BADGE = 3;
     private static final int RELIABLE_RATE_PERCENT = 90;
-    private static final List<LoanStatus> ACTIVE_STATUSES = List.of(LoanStatus.REQUESTED, LoanStatus.APPROVED);
+    private static final List<LoanStatus> ACTIVE_STATUSES = List.of(LoanStatus.BORROWED);
+    private static final List<LoanStatus> RETURN_STATUSES = List.of(LoanStatus.PENDING_REVIEW, LoanStatus.RETURNED);
     private static final Set<String> SORTABLE_FIELDS =
             Set.of("id", "createdAt", "loanDate", "dueDate", "returnDate", "status");
 
@@ -51,6 +57,7 @@ public class LoanService {
     private final UserRepository userRepository;
     private final BookRepository bookRepository;
     private final InventoryRepository inventoryRepository;
+    private final FineRepository fineRepository;
     private final NotificationService notificationService;
     private final AuditLogService auditLogService;
 
@@ -84,15 +91,17 @@ public class LoanService {
     //workflow
 
     /**
-     * Creates a new loan request in the REQUESTED state for the logged-in member.
-     * Stock is not touched here; a copy is only taken when a librarian approves.
+     * Borrows a book on the spot for the logged-in member, with no approval step.
+     * One copy is taken out of stock right away, the loan date is today and the due date is today
+     * plus the requested days. The inventory row is locked so two members cannot take the last copy.
      *
      * @throws InvalidRequestException if the book id is missing or the duration is not 1 to 30 days
-     * @throws InformationExistException if the member already has an active request or loan for this book
-     * @throws InvalidStateException if the member already has 5 active requests or loans
+     * @throws InformationExistException if the member already has this book on loan
+     * @throws InvalidStateException if the book is inactive, no copies are available,
+     *                               or the member already has 5 books on loan
      */
     @Transactional
-    public LoanResponse requestLoan(Authentication authentication, LoanRequest request) {
+    public LoanResponse borrow(Authentication authentication, LoanRequest request) {
         if (request.getBookId() == null) {
             throw new InvalidRequestException("Book ID is required");
         }
@@ -109,115 +118,61 @@ public class LoanService {
         }
 
         if (loanRepository.existsByUserIdAndBookIdAndStatusIn(user.getId(), book.getId(), ACTIVE_STATUSES)) {
-            throw new InformationExistException("You already have an active request or loan for this book");
+            throw new InformationExistException("You already have this book on loan");
         }
         if (loanRepository.countByUserIdAndStatusIn(user.getId(), ACTIVE_STATUSES) >= MAX_ACTIVE_LOANS) {
-            throw new InvalidStateException(
-                    "You can have at most " + MAX_ACTIVE_LOANS + " active requests or loans");
+            throw new InvalidStateException("You can have at most " + MAX_ACTIVE_LOANS + " books on loan");
         }
 
-        Loan loan = new Loan();
-        loan.setUser(user);
-        loan.setBook(book);
-        loan.setRequestedDays(days);
-        loan = loanRepository.save(loan);
-
-        auditLogService.log("LOAN", "REQUESTED", loan.getId());
-        notifyLibrarians(loan, "LOAN_REQUESTED", user.getUsername() + " requested \"" + book.getTitle() + "\"");
-        return LoanResponse.from(loan);
-    }
-
-    /**
-     * Approves a REQUESTED loan: takes one copy out of stock and sets the loan date
-     * to today and the due date to today plus the requested days.
-     * The inventory row is locked so two librarians cannot hand out the last copy twice.
-     *
-     * @throws InvalidStateException if the loan is not REQUESTED or no copies are available
-     */
-    @Transactional
-    public LoanResponse approve(Long loanId, Authentication librarian) {
-        Loan loan = getLoanForUpdate(loanId);
-        requireTransition(loan, LoanStatus.APPROVED);
-
-        Inventory inventory = getInventoryForUpdate(loan.getBook().getId());
+        Inventory inventory = getInventoryForUpdate(book.getId());
         if (inventory.getAvailableCopies() < 1) {
-            throw new InvalidStateException("No copies of \"" + loan.getBook().getTitle() + "\" are available");
+            throw new InvalidStateException("No copies of \"" + book.getTitle() + "\" are available");
         }
         inventory.setAvailableCopies(inventory.getAvailableCopies() - 1);
 
         LocalDate today = LocalDate.now();
-        loan.setStatus(LoanStatus.APPROVED);
+        Loan loan = new Loan();
+        loan.setUser(user);
+        loan.setBook(book);
+        loan.setStatus(LoanStatus.BORROWED);
+        loan.setRequestedDays(days);
         loan.setLoanDate(today);
-        loan.setDueDate(today.plusDays(loan.getRequestedDays()));
-        recordDecision(loan, librarian);
+        loan.setDueDate(today.plusDays(days));
+        loan = loanRepository.save(loan);
 
-        auditLogService.log("LOAN", "APPROVED", loanId);
-        notifyMember(loan, "LOAN_APPROVED",
-                "Your request for \"" + loan.getBook().getTitle() + "\" was approved. Due " + loan.getDueDate());
-        return LoanResponse.from(loan);
-    }
-
-    @Transactional
-    public LoanResponse reject(Long loanId, String reason, Authentication librarian) {
-        Loan loan = getLoanForUpdate(loanId);
-        requireTransition(loan, LoanStatus.REJECTED);
-
-        loan.setStatus(LoanStatus.REJECTED);
-        loan.setRejectionReason(reason == null || reason.isBlank() ? null : reason.trim());
-        recordDecision(loan, librarian);
-
-        auditLogService.log("LOAN", "REJECTED", loanId);
-        notifyMember(loan, "LOAN_REJECTED", "Your request for \"" + loan.getBook().getTitle() + "\" was rejected"
-                + (loan.getRejectionReason() == null ? "" : ": " + loan.getRejectionReason()));
+        auditLogService.log("LOAN", "BORROWED", loan.getId());
         return LoanResponse.from(loan);
     }
 
 
     /**
-     * Cancels a loan. A member may cancel only their own REQUESTED loan; only a librarian
-     * may cancel an APPROVED loan, which also puts the copy back in stock.
+     * Cancels a loan that is still out (for example one made by mistake) and puts the copy back in stock.
+     * Librarian only.
      *
-     * @throws AccessDeniedException if the caller is not allowed to cancel this loan
-     * @throws InvalidStateException if the loan is already finished (rejected, cancelled or returned)
+     * @throws InvalidStateException if the loan is already finished (returned or cancelled)
      */
     @Transactional
-    public LoanResponse cancel(Long loanId, Authentication authentication) {
+    public LoanResponse cancel(Long loanId) {
         Loan loan = getLoanForUpdate(loanId);
-        User actor = getUserFromAuth(authentication);
-        boolean librarian = Roles.isLibrarian(authentication);
-        boolean owner = loan.getUser().getId().equals(actor.getId());
-
-        if (!owner && !librarian) {
-            throw new AccessDeniedException("You can only cancel your own loan requests");
-        }
         requireTransition(loan, LoanStatus.CANCELLED);
-        if (loan.getStatus() == LoanStatus.APPROVED) {
-            if (!librarian) {
-                throw new AccessDeniedException("Only a librarian can cancel an approved loan");
-            }
-            giveCopyBack(loan.getBook().getId());
-        }
+        giveCopyBack(loan.getBook().getId());
 
         loan.setStatus(LoanStatus.CANCELLED);
         auditLogService.log("LOAN", "CANCELLED", loanId);
-        if (owner) {
-            notifyLibrarians(loan, "LOAN_CANCELLED",
-                    actor.getUsername() + " cancelled the request for \"" + loan.getBook().getTitle() + "\"");
-        } else {
-            recordDecision(loan, authentication);
-            notifyMember(loan, "LOAN_CANCELLED",
-                    "Your loan of \"" + loan.getBook().getTitle() + "\" was cancelled by a librarian");
-        }
+        notifyMember(loan, "LOAN_CANCELLED",
+                "Your loan of \"" + loan.getBook().getTitle() + "\" was cancelled by a librarian");
         return LoanResponse.from(loan);
     }
 
 
     /**
-     * Marks an APPROVED loan as returned today, puts the copy back in stock and reports
-     * whether it came back early, on time or late. Allowed for the borrower or a librarian.
+     * Hands a loan back today. The return is checked against the due date (early, on time or late)
+     * and the loan moves to PENDING_REVIEW, where a librarian inspects the copy for damage.
+     * The copy is NOT put back in stock yet; that happens when the librarian clears it.
+     * Allowed for the borrower or a librarian.
      *
      * @throws AccessDeniedException if the caller is neither the borrower nor a librarian
-     * @throws InvalidStateException if the loan is not APPROVED
+     * @throws InvalidStateException if the loan is not currently borrowed
      */
     @Transactional
     public LoanResponse returnLoan(Long loanId, Authentication authentication) {
@@ -226,10 +181,9 @@ public class LoanService {
         if (!owner && !Roles.isLibrarian(authentication)) {
             throw new AccessDeniedException("You can only return your own loans");
         }
-        requireTransition(loan, LoanStatus.RETURNED);
+        requireTransition(loan, LoanStatus.PENDING_REVIEW);
 
-        giveCopyBack(loan.getBook().getId());
-        loan.setStatus(LoanStatus.RETURNED);
+        loan.setStatus(LoanStatus.PENDING_REVIEW);
         loan.setReturnDate(LocalDate.now());
 
         String timing = describeTiming(ReturnTiming.daysLate(loan.getDueDate(), loan.getReturnDate()));
@@ -238,10 +192,78 @@ public class LoanService {
         String title = loan.getBook().getTitle();
         if (owner) {
             notifyLibrarians(loan, "LOAN_RETURNED",
-                    loan.getUser().getUsername() + " returned \"" + title + "\" " + timing);
+                    loan.getUser().getUsername() + " returned \"" + title + "\" " + timing + ". Waiting for review");
         } else {
-            notifyMember(loan, "LOAN_RETURNED", "\"" + title + "\" was marked as returned " + timing);
+            notifyMember(loan, "LOAN_RETURNED",
+                    "\"" + title + "\" was marked as returned " + timing + ". It is waiting for a librarian's review");
         }
+        return LoanResponse.from(loan);
+    }
+
+
+    /**
+     * Returns one page of loans waiting for a return review (PENDING_REVIEW), oldest return first by default.
+     * Each entry shows whether it came back early, on time or late.
+     *
+     * @throws InvalidRequestException if sortBy is not an allowed field
+     */
+    @Transactional(readOnly = true)
+    public Page<LoanResponse> getReturnsReview(int page, int size, String sortBy, String sortDir) {
+        Pageable pageable = PageUtils.pageable(page, size, sortBy, sortDir, SORTABLE_FIELDS);
+        return loanRepository.findAllByStatus(LoanStatus.PENDING_REVIEW, pageable).map(LoanResponse::from);
+    }
+
+    /**
+     * Finishes a return after the librarian has inspected the copy.
+     * Not damaged: the copy goes back in stock. Damaged: the copy is taken out of circulation
+     * (total copies goes down by one). Either way a fine can be charged, and the member is told the outcome.
+     *
+     * @throws InvalidStateException if the loan is not waiting for review
+     */
+    @Transactional
+    public LoanResponse reviewReturn(Long loanId, ReviewReturnRequest request, Authentication librarian) {
+        Loan loan = getLoanForUpdate(loanId);
+        if (loan.getStatus() != LoanStatus.PENDING_REVIEW) {
+            throw new InvalidStateException("Only a returned loan waiting for review can be reviewed, but this loan is "
+                    + loan.getStatus());
+        }
+
+        String notes = request.notes() == null || request.notes().isBlank() ? null : request.notes().trim();
+        long daysLate = ReturnTiming.daysLate(loan.getDueDate(), loan.getReturnDate());
+        boolean late = ReturnTiming.of(daysLate) == ReturnTiming.LATE;
+
+        if (request.damaged()) {
+            withdrawCopy(loan.getBook().getId());
+        } else {
+            giveCopyBack(loan.getBook().getId());
+        }
+
+        BigDecimal fineAmount = request.fineAmount();
+        boolean fined = fineAmount != null && fineAmount.signum() > 0;
+        if (fined) {
+            Fine fine = new Fine();
+            fine.setLoan(loan);
+            fine.setAmount(fineAmount);
+            fine.setReason(fineReason(request.damaged(), late, daysLate, notes));
+            fineRepository.save(fine);
+        }
+
+        loan.setStatus(LoanStatus.RETURNED);
+        loan.setDamaged(request.damaged());
+        loan.setReviewNotes(notes);
+        loan.setReviewedBy(getUserFromAuth(librarian));
+        loan.setReviewedAt(LocalDateTime.now());
+
+        auditLogService.log("LOAN", request.damaged() ? "RETURN_DAMAGED" : "RETURN_CLEARED", loanId);
+
+        String title = loan.getBook().getTitle();
+        String message = request.damaged()
+                ? "Your return of \"" + title + "\" was reviewed: damage was found" + (notes == null ? "" : " (" + notes + ")")
+                : "Your return of \"" + title + "\" was reviewed and accepted. Thank you!";
+        if (fined) {
+            message += ". A fine of " + fineAmount.toPlainString() + " was added";
+        }
+        notifyMember(loan, "RETURN_REVIEWED", message);
         return LoanResponse.from(loan);
     }
 
@@ -261,7 +283,7 @@ public class LoanService {
         int early = 0;
         int onTime = 0;
         int late = 0;
-        List<Loan> returned = loanRepository.findAllByUserIdAndStatus(userId, LoanStatus.RETURNED);
+        List<Loan> returned = loanRepository.findAllByUserIdAndStatusIn(userId, RETURN_STATUSES);
         for (Loan loan : returned) {
             switch (ReturnTiming.of(ReturnTiming.daysLate(loan.getDueDate(), loan.getReturnDate()))) {
                 case EARLY -> early++;
@@ -320,9 +342,27 @@ public class LoanService {
         inventory.setAvailableCopies(Math.min(inventory.getTotalCopies(), inventory.getAvailableCopies() + 1));
     }
 
-    private void recordDecision(Loan loan, Authentication librarian) {
-        loan.setDecidedBy(getUserFromAuth(librarian));
-        loan.setDecidedAt(LocalDateTime.now());
+    /**
+     * Takes a damaged copy out of circulation. The copy was already out of the available stock,
+     * so only the total goes down.
+     */
+    private void withdrawCopy(Long bookId) {
+        Inventory inventory = getInventoryForUpdate(bookId);
+        int total = Math.max(0, inventory.getTotalCopies() - 1);
+        inventory.setTotalCopies(total);
+        inventory.setAvailableCopies(Math.min(inventory.getAvailableCopies(), total));
+    }
+
+    private static String fineReason(boolean damaged, boolean late, long daysLate, String notes) {
+        List<String> parts = new ArrayList<>();
+        if (damaged) {
+            parts.add("Damaged on return");
+        }
+        if (late) {
+            parts.add("Returned " + daysLate + " day(s) late");
+        }
+        String reason = parts.isEmpty() ? "Fine added by librarian" : String.join(", ", parts);
+        return notes == null ? reason : reason + ": " + notes;
     }
 
     private void notifyMember(Loan loan, String type, String message) {

@@ -20,7 +20,7 @@ public interface LoanRepository extends JpaRepository<Loan, Long> {
 
     Page<Loan> findAllByUserId(Long userId, Pageable pageable);
 
-    List<Loan> findAllByUserIdAndStatus(Long userId, LoanStatus status);
+    List<Loan> findAllByUserIdAndStatusIn(Long userId, Collection<LoanStatus> statuses);
 
     boolean existsByUserIdAndBookIdAndStatusIn(Long userId, Long bookId, Collection<LoanStatus> statuses);
 
