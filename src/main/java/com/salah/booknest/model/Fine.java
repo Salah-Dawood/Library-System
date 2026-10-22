@@ -26,9 +26,15 @@ public class Fine {
     @JoinColumn(name = "loan_id", nullable = false)
     private Loan loan;
 
-    @Column(nullable = false)
-    @ColumnDefault("false")
-    private Boolean isPaid = false;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @ColumnDefault("'DAMAGE'")
+    private FineType type = FineType.DAMAGE;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @ColumnDefault("'PENDING'")
+    private FineStatus status = FineStatus.PENDING;
 
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal amount;

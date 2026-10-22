@@ -2,12 +2,14 @@ package com.salah.booknest.config;
 
 import com.salah.booknest.exception.InformationNotFoundException;
 import com.salah.booknest.model.Book;
+import com.salah.booknest.model.Fine;
 import com.salah.booknest.model.Inventory;
 import com.salah.booknest.model.Loan;
 import com.salah.booknest.model.LoanStatus;
 import com.salah.booknest.model.Review;
 import com.salah.booknest.model.User;
 import com.salah.booknest.repository.BookRepository;
+import com.salah.booknest.repository.FineRepository;
 import com.salah.booknest.repository.LoanRepository;
 import com.salah.booknest.repository.ReviewRepository;
 import com.salah.booknest.repository.UserRepository;
@@ -19,8 +21,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 
 /**
  * Adds sample loans and reviews (and their audit entries) for the users and books created by DatabaseSeeder,
@@ -36,6 +38,7 @@ public class SampleActivitySeeder implements CommandLineRunner {
     private final BookRepository bookRepository;
     private final LoanRepository loanRepository;
     private final ReviewRepository reviewRepository;
+    private final FineRepository fineRepository;
     private final AuditLogService auditLogService;
     private final PlatformTransactionManager transactionManager;
 
@@ -75,30 +78,28 @@ public class SampleActivitySeeder implements CommandLineRunner {
         Book dune = findBook("Dune");
         Book duneMessiah = findBook("Dune Messiah");
 
-        // returned(librarian, member, book, days, loanedDaysAgo, returnedDaysAfterDue)
-        //   returnedDaysAfterDue: negative = early, 0 = on time, positive = late
-        // approved(librarian, member, book, days, loanedDaysAgo)
 
         // johnd: a reliable member. Every return was on time or early, which earns the "Reliable member" badge.
-        returned(librarian, john, nineteen84, 14, 40, -2);
-        returned(librarian, john, hobbit, 14, 30, 0);
-        returned(librarian, john, dune, 7, 20, -1);
-        approved(librarian, john, foundation, 14, 5);
-        requested(john, orientExpress, 7);
+        returnedAndCleared(librarian, john, nineteen84, 14, 40, -2);
+        returnedAndCleared(librarian, john, hobbit, 14, 30, 0);
+        returnedAndCleared(librarian, john, dune, 7, 20, -1);
+        borrowed(john, foundation, 14, 5);
+        borrowed(john, orientExpress, 7, 1);
 
-        // janed: one late return, one overdue loan, two pending requests and one rejected request
-        returned(librarian, jane, animalFarm, 14, 35, 3);
-        returned(librarian, jane, mockingbird, 14, 25, 0);
-        approved(librarian, jane, iRobot, 14, 20); // due 6 days ago, so it shows as overdue
-        requested(jane, duneMessiah, 7);
-        requested(jane, harryPotter, 14);
-        rejected(librarian, jane, roadBack, 14, "This title is reserved for a class this month");
+        // janed: late returns, one overdue loan, one late return waiting for review, one damaged return with a fine
+        returnedAndCleared(librarian, jane, animalFarm, 14, 35, 3);
+        returnedAndCleared(librarian, jane, mockingbird, 14, 25, 0);
+        returnedDamaged(librarian, jane, roadBack, 14, 45, 1, "Water damage on the cover", new BigDecimal("5.00"));
+        borrowed(jane, iRobot, 14, 20); // due 6 days ago, so it shows as overdue
+        borrowed(jane, harryPotter, 14, 3);
+        returnedPendingReview(jane, duneMessiah, 14, 20, 2); // returned 2 days late, waiting for the librarian
 
-        // alexm: a newer member with one return, one active loan, one pending and one cancelled request
-        returned(librarian, alex, hobbit, 14, 18, -2);
-        approved(librarian, alex, allQuiet, 10, 2);
-        requested(alex, fellowship, 21);
-        cancelled(alex, noneLeft, 7);
+        // alexm: a newer member with one return, one active loan, one on-time return in the review queue
+        // and one loan a librarian canceled
+        returnedAndCleared(librarian, alex, hobbit, 14, 18, -2);
+        borrowed(alex, allQuiet, 10, 2);
+        returnedPendingReview(alex, fellowship, 7, 8, 0);
+        cancelledByLibrarian(librarian, alex, noneLeft, 7, 3);
 
         // Reviews. Only members who returned a book can review it (see ReviewService), so every review
         // below matches a returned loan above. johnd returned "Dune" but has not reviewed it yet, so
@@ -112,53 +113,64 @@ public class SampleActivitySeeder implements CommandLineRunner {
 
     // ---- loan states ----
 
-    /** A request that is waiting for a librarian. */
-    private void requested(User member, Book book, int days) {
-        Loan loan = loanRepository.save(newLoan(member, book, LoanStatus.REQUESTED, days));
-        audit("LOAN", member, "REQUESTED", loan.getId());
-    }
-
-    /** A loan that was approved and is still out. It takes one copy from the stock. */
-    private void approved(User librarian, User member, Book book, int days, int loanedDaysAgo) {
-        Loan loan = newLoan(member, book, LoanStatus.APPROVED, days);
-        setApprovalDetails(loan, librarian, loanedDaysAgo);
+    /** A loan that is still out. It takes one copy from the stock. */
+    private void borrowed(User member, Book book, int days, int loanedDaysAgo) {
+        Loan loan = newLoan(member, book, LoanStatus.BORROWED, days, loanedDaysAgo);
         loan = loanRepository.save(loan);
         takeCopy(book);
 
-        audit("LOAN", member, "REQUESTED", loan.getId());
-        audit("LOAN", librarian, "APPROVED", loan.getId());
+        audit("LOAN", member, "BORROWED", loan.getId());
     }
 
-    /** A loan that was approved and then returned. The copy is back in stock, so the stock is unchanged. */
-    private void returned(User librarian, User member, Book book, int days, int loanedDaysAgo, int returnedDaysAfterDue) {
-        Loan loan = newLoan(member, book, LoanStatus.RETURNED, days);
-        setApprovalDetails(loan, librarian, loanedDaysAgo);
+    /** A returned loan a librarian checked and accepted. The copy is back in stock, so the stock is unchanged. */
+    private void returnedAndCleared(User librarian, User member, Book book, int days, int loanedDaysAgo, int returnedDaysAfterDue) {
+        Loan loan = newLoan(member, book, LoanStatus.RETURNED, days, loanedDaysAgo);
         loan.setReturnDate(loan.getDueDate().plusDays(returnedDaysAfterDue));
+        markReviewed(loan, librarian, false, null);
         loan = loanRepository.save(loan);
 
-        audit("LOAN", member, "REQUESTED", loan.getId());
-        audit("LOAN", librarian, "APPROVED", loan.getId());
+        audit("LOAN", member, "BORROWED", loan.getId());
+        audit("LOAN", member, "RETURNED", loan.getId());
+        audit("LOAN", librarian, "RETURN_CLEARED", loan.getId());
+    }
+
+    /** A returned loan where the librarian found damage and charged a fine. The copy is withdrawn from stock. */
+    private void returnedDamaged(User librarian, User member, Book book, int days, int loanedDaysAgo,
+                                 int returnedDaysAfterDue, String notes, BigDecimal fineAmount) {
+        Loan loan = newLoan(member, book, LoanStatus.RETURNED, days, loanedDaysAgo);
+        loan.setReturnDate(loan.getDueDate().plusDays(returnedDaysAfterDue));
+        markReviewed(loan, librarian, true, notes);
+        loan = loanRepository.save(loan);
+        withdrawCopy(book);
+
+        Fine fine = new Fine();
+        fine.setLoan(loan);
+        fine.setAmount(fineAmount);
+        fine.setReason("Damaged on return, returned " + returnedDaysAfterDue + " day(s) late: " + notes);
+        fineRepository.save(fine);
+
+        audit("LOAN", member, "BORROWED", loan.getId());
+        audit("LOAN", member, "RETURNED", loan.getId());
+        audit("LOAN", librarian, "RETURN_DAMAGED", loan.getId());
+    }
+
+    /** A returned loan waiting in the review queue. The copy has not gone back to stock yet. */
+    private void returnedPendingReview(User member, Book book, int days, int loanedDaysAgo, int returnedDaysAfterDue) {
+        Loan loan = newLoan(member, book, LoanStatus.PENDING_REVIEW, days, loanedDaysAgo);
+        loan.setReturnDate(loan.getDueDate().plusDays(returnedDaysAfterDue));
+        loan = loanRepository.save(loan);
+        takeCopy(book);
+
+        audit("LOAN", member, "BORROWED", loan.getId());
         audit("LOAN", member, "RETURNED", loan.getId());
     }
 
-    /** A request a librarian turned down, with the reason shown to the member. */
-    private void rejected(User librarian, User member, Book book, int days, String reason) {
-        Loan loan = newLoan(member, book, LoanStatus.REJECTED, days);
-        loan.setRejectionReason(reason);
-        loan.setDecidedBy(librarian);
-        loan.setDecidedAt(LocalDateTime.now().minusDays(3));
-        loan = loanRepository.save(loan);
+    /** A loan a librarian cancelled while it was out. The copy went back, so the stock is unchanged. */
+    private void cancelledByLibrarian(User librarian, User member, Book book, int days, int loanedDaysAgo) {
+        Loan loan = loanRepository.save(newLoan(member, book, LoanStatus.CANCELLED, days, loanedDaysAgo));
 
-        audit("LOAN", member, "REQUESTED", loan.getId());
-        audit("LOAN", librarian, "REJECTED", loan.getId());
-    }
-
-    /** A request the member cancelled themselves (no librarian decision is recorded for that). */
-    private void cancelled(User member, Book book, int days) {
-        Loan loan = loanRepository.save(newLoan(member, book, LoanStatus.CANCELLED, days));
-
-        audit("LOAN", member, "REQUESTED", loan.getId());
-        audit("LOAN", member, "CANCELLED", loan.getId());
+        audit("LOAN", member, "BORROWED", loan.getId());
+        audit("LOAN", librarian, "CANCELLED", loan.getId());
     }
 
     // ---- reviews ----
@@ -176,22 +188,32 @@ public class SampleActivitySeeder implements CommandLineRunner {
 
     // ---- helpers ----
 
-    private Loan newLoan(User member, Book book, LoanStatus status, int days) {
+    /** Same dates as LoanService.borrow: loan date is the borrow day, due date is loan date + days. */
+    private Loan newLoan(User member, Book book, LoanStatus status, int days, int loanedDaysAgo) {
         Loan loan = new Loan();
         loan.setUser(member);
         loan.setBook(book);
         loan.setStatus(status);
         loan.setRequestedDays(days);
+        LocalDate loanDate = LocalDate.now().minusDays(loanedDaysAgo);
+        loan.setLoanDate(loanDate);
+        loan.setDueDate(loanDate.plusDays(days));
         return loan;
     }
 
-    /** Same as LoanService.approve: loan date, due date (loan date + requested days) and who decided. */
-    private void setApprovalDetails(Loan loan, User librarian, int loanedDaysAgo) {
-        LocalDate loanDate = LocalDate.now().minusDays(loanedDaysAgo);
-        loan.setLoanDate(loanDate);
-        loan.setDueDate(loanDate.plusDays(loan.getRequestedDays()));
-        loan.setDecidedBy(librarian);
-        loan.setDecidedAt(loanDate.atTime(10, 0));
+    private void markReviewed(Loan loan, User librarian, boolean damaged, String notes) {
+        loan.setDamaged(damaged);
+        loan.setReviewNotes(notes);
+        loan.setReviewedBy(librarian);
+        loan.setReviewedAt(loan.getReturnDate().atTime(11, 0));
+    }
+
+    /** A damaged copy leaves circulation: it was already out of the available stock, so only the total drops. */
+    private void withdrawCopy(Book book) {
+        Inventory inventory = book.getInventory();
+        int total = Math.max(0, inventory.getTotalCopies() - 1);
+        inventory.setTotalCopies(total);
+        inventory.setAvailableCopies(Math.min(inventory.getAvailableCopies(), total));
     }
 
     private void takeCopy(Book book) {
