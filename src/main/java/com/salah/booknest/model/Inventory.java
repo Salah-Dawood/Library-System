@@ -5,7 +5,7 @@ import lombok.*;
 
 @AllArgsConstructor
 @NoArgsConstructor
-@ToString
+@ToString(exclude = "book")
 @Getter
 @Setter
 @Entity

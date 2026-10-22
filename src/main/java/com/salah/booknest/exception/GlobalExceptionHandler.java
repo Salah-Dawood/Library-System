@@ -73,6 +73,15 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.FORBIDDEN, "ACCOUNT_DEACTIVATED", "This account has been deactivated", req);
     }
 
+    @ExceptionHandler(UserNotVerifiedException.class)
+    public ResponseEntity<Map<String, String>> notVerified(UserNotVerifiedException ex) {
+        // Keeps the body the login endpoint has always returned: the frontend checks status == "USER_NOT_VERIFIED"
+        Map<String, String> body = new LinkedHashMap<>();
+        body.put("status", "USER_NOT_VERIFIED");
+        body.put("message", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiError> dataConflict(DataIntegrityViolationException ex, HttpServletRequest req) {
         log.warn("Data integrity violation on {}: {}", req.getRequestURI(), ex.getMostSpecificCause().getMessage());

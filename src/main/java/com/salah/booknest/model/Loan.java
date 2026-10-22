@@ -7,6 +7,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 
 @AllArgsConstructor
@@ -56,6 +57,10 @@ public class Loan {
 
     @Column(name = "rejection_reason")
     private String rejectionReason;
+
+    @OneToMany(fetch = FetchType.LAZY)
+    @JoinColumn
+    private List<Fine> fines;
 
     @CreationTimestamp
     @Column(name = "created_at")

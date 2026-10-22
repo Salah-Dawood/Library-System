@@ -2,6 +2,8 @@ package com.salah.booknest.service;
 
 import com.salah.booknest.exception.InformationExistException;
 import com.salah.booknest.exception.InformationNotFoundException;
+import com.salah.booknest.exception.InvalidRequestException;
+import com.salah.booknest.exception.UserNotVerifiedException;
 import com.salah.booknest.model.User;
 import com.salah.booknest.model.UserProfile;
 import com.salah.booknest.model.request.LoginRequest;
@@ -12,8 +14,6 @@ import com.salah.booknest.repository.UserRepository;
 import com.salah.booknest.security.JWTUtils;
 import com.salah.booknest.security.MyUserDetails;
 import org.springframework.context.annotation.Lazy;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -87,10 +87,11 @@ public class UserService {
     }
 
     /**
-     * Authenticates the user and returns a JWT with a user summary. Users who have not verified
-     * their email get a 403 response with status USER_NOT_VERIFIED instead of a token.
+     * Authenticates the user and returns a JWT with a user summary.
+     *
+     * @throws UserNotVerifiedException if the user has not verified their email yet
      */
-    public ResponseEntity<?> loginUser(LoginRequest loginRequest) {
+    public LoginResponse loginUser(LoginRequest loginRequest) {
 
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
@@ -106,11 +107,7 @@ public class UserService {
 
 //        verify user is verified
         if (!dbUser.getIsVerified()) {
-            java.util.Map<String, String> errorDetails = new java.util.HashMap<>();
-            errorDetails.put("status", "USER_NOT_VERIFIED");
-            errorDetails.put("message", "Please verify your email before logging in.");
-
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorDetails);
+            throw new UserNotVerifiedException("Please verify your email before logging in.");
         }
 
         //generate jwt
@@ -125,17 +122,17 @@ public class UserService {
                 dbUser.getIsActive()
         );
 
-        return ResponseEntity.ok(new LoginResponse(jwt, summary));
+        return new LoginResponse(jwt, summary);
     }
 
     /**
      * Sets a new password using the token from the reset email.
-     * Returns 400 if the token is expired, invalid, or not a password-reset token.
+     *
+     * @throws InvalidRequestException if the token is expired, invalid, or not a password-reset token
      */
-    public ResponseEntity<MessageResponse> executePasswordReset(String token,String password){
+    public MessageResponse executePasswordReset(String token,String password){
         if (!jwtUtils.validateJwtToken(token) || !jwtUtils.isPasswordResetToken(token)) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(new MessageResponse("Failed to reset password: link has expired or is invalid."));
+            throw new InvalidRequestException("Failed to reset password: link has expired or is invalid.");
         }
 
         String username = jwtUtils.getUserNameFromJwtToken(token);
@@ -146,6 +143,6 @@ public class UserService {
         user.setPassword(passwordEncoder.encode(password));
         userRepository.save(user);
 
-        return ResponseEntity.ok(new MessageResponse("Password updated successfully. You can now log in."));
+        return new MessageResponse("Password updated successfully. You can now log in.");
     }
 }

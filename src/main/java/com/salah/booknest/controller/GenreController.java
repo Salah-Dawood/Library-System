@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import com.salah.booknest.model.response.GenreResponse;
 import com.salah.booknest.service.GenreService;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -53,8 +54,8 @@ public class GenreController {
             examples = @ExampleObject(value = "{\"name\":\"Science Fiction\",\"description\":\"Speculative fiction about science and the future\"}")))
     @PostMapping("")
     @PreAuthorize("hasRole('librarian')")
-    public ResponseEntity<?> createGenre(@Valid @RequestBody GenreRequest request){
-        return genreService.createGenre(request);
+    public ResponseEntity<GenreResponse> createGenre(@Valid @RequestBody GenreRequest request){
+        return new ResponseEntity<>(genreService.createGenre(request), HttpStatus.CREATED);
     }
 
     @Operation(summary = "Delete a genre", description = "Refused while any book still uses the genre. Librarian only.")
@@ -65,8 +66,9 @@ public class GenreController {
     })
     @DeleteMapping("/{genreId}")
     @PreAuthorize("hasRole('librarian')")
-    public ResponseEntity<?> deleteGenre(@Parameter(description = "Id of the genre") @PathVariable Long genreId){
-        return genreService.deleteGenre(genreId);
+    public ResponseEntity<Void> deleteGenre(@Parameter(description = "Id of the genre") @PathVariable Long genreId){
+        genreService.deleteGenre(genreId);
+        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
 
     @Operation(summary = "Edit a genre", description = "Only the fields you send are changed. A genre can keep its own name. Librarian only.")
@@ -79,8 +81,8 @@ public class GenreController {
             examples = @ExampleObject(value = "{\"name\":\"Science Fiction\",\"description\":\"Speculative fiction about science and the future\"}")))
     @PutMapping("/{genreId}")
     @PreAuthorize("hasRole('librarian')")
-    public ResponseEntity<?> updateGenre(@Parameter(description = "Id of the genre") @PathVariable Long genreId,
-                                         @Valid @RequestBody GenreRequest request){
-        return genreService.updateGenre(genreId,request);
+    public ResponseEntity<GenreResponse> updateGenre(@Parameter(description = "Id of the genre") @PathVariable Long genreId,
+                                                     @Valid @RequestBody GenreRequest request){
+        return new ResponseEntity<>(genreService.updateGenre(genreId,request), HttpStatus.OK);
     }
 }
