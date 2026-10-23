@@ -35,8 +35,8 @@ public class FineController {
     }
 
     @PutMapping("/{id}/pay")
-    public ResponseEntity<FineResponse> payFine(@PathVariable Long id){
-        return new ResponseEntity<>(fineService.payFine(id),HttpStatus.OK);
+    public ResponseEntity<FineResponse> payFine(@PathVariable Long id,Authentication authentication){
+        return new ResponseEntity<>(fineService.payFine(id,authentication),HttpStatus.OK);
     }
 
 

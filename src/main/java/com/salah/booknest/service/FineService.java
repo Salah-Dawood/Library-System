@@ -62,8 +62,9 @@ public class FineService {
                 .toList();
     }
 
-    public FineResponse payFine(Long id){
+    public FineResponse payFine(Long id, Authentication authentication){
         Fine fine = fineRepository.findById(id).orElseThrow(() -> new InformationNotFoundException("Fine with ID " + id + " not found!"));
+        if (fine.getLoan().getUser().getUsername().equals(authentication.getName()))
         fine.setStatus(FineStatus.PAID);
 
         return fineResponser(fine);
