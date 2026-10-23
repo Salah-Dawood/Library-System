@@ -1,5 +1,6 @@
 package com.salah.booknest.controller;
 
+import com.salah.booknest.model.response.MessageResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -34,11 +35,11 @@ public class EmailVerificationController {
             @ApiResponse(responseCode = "429", description = "Too many requests")
     })
     @PutMapping("/getverification/{username}")
-    public String sendVerificationCode(@Parameter(description = "Username") @PathVariable String username){
+    public MessageResponse sendVerificationCode(@Parameter(description = "Username") @PathVariable String username){
         User user = userRepository.findUserByUsername(username)
                 .orElseThrow(() -> new InformationNotFoundException("Username " + username + " not found"));
         emailVerificationService.sendVerificationCode(user);
-        return "SENT";
+        return new MessageResponse("Sent");
     }
 
     @Operation(summary = "Verify an email address", description = "Marks the account as verified when the code matches. Unverified users cannot log in. Public: no token needed.")

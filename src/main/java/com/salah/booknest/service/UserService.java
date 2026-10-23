@@ -28,8 +28,6 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final JWTUtils jwtUtils;
     private final AuthenticationManager authenticationManager;
-    private MyUserDetails myUserDetails;
-    private EmailVerificationService emailVerificationService;
     private final AuditLogService auditLogService;
 
     public UserService(UserRepository userRepository,
@@ -43,8 +41,6 @@ public class UserService {
         this.passwordEncoder = passwordEncoder;
         this.jwtUtils = jwtUtils;
         this.authenticationManager = authenticationManager;
-        this.myUserDetails = myUserDetails;
-        this.emailVerificationService = emailVerificationService;
         this.auditLogService = auditLogService;
     }
 
