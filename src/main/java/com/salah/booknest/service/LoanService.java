@@ -55,6 +55,7 @@ public class LoanService {
     private final FineRepository fineRepository;
     private final NotificationService notificationService;
     private final AuditLogService auditLogService;
+    private final AppSharedService appSharedService;
 
 
     /**
@@ -74,7 +75,7 @@ public class LoanService {
 
     @Transactional(readOnly = true)
     public Page<LoanResponse> getMyLoans(Authentication authentication, int page, int size, String sortBy, String sortDir) {
-        return getByUserId(getUserFromAuth(authentication).getId(), page, size, sortBy, sortDir);
+        return getByUserId(appSharedService.getUserFromAuth(authentication).getId(), page, size, sortBy, sortDir);
     }
 
     @Transactional(readOnly = true)
@@ -105,7 +106,7 @@ public class LoanService {
             throw new InvalidRequestException("Loan duration must be between 1 and " + MAX_LOAN_DAYS + " days");
         }
 
-        User user = getUserFromAuth(authentication);
+        User user = appSharedService.getUserFromAuth(authentication);
         Book book = bookRepository.findById(request.getBookId()).orElseThrow(
                 () -> new InformationNotFoundException("Book with ID " + request.getBookId() + " not found"));
         if (!Boolean.TRUE.equals(book.getActive())) {
@@ -252,7 +253,7 @@ public class LoanService {
         loan.setStatus(LoanStatus.RETURNED);
         loan.setDamaged(request.damaged());
         loan.setReviewNotes(notes);
-        loan.setReviewedBy(getUserFromAuth(librarian));
+        loan.setReviewedBy(appSharedService.getUserFromAuth(librarian));
         loan.setReviewedAt(LocalDateTime.now());
 
         auditLogService.log("LOAN", request.damaged() ? "RETURN_DAMAGED" : "RETURN_CLEARED", loanId);
@@ -271,7 +272,7 @@ public class LoanService {
 
     @Transactional(readOnly = true)
     public ReturnStats getMyStats(Authentication authentication) {
-        return getStats(getUserFromAuth(authentication).getId());
+        return getStats((appSharedService.getUserFromAuth(authentication)).getId());
     }
 
     //count return status
@@ -300,11 +301,7 @@ public class LoanService {
 
     // helper methods
 
-    private User getUserFromAuth(Authentication authentication) {
-        String username = authentication.getName();
-        return userRepository.findUserByUsername(username)
-                .orElseThrow(() -> new InformationNotFoundException("Username " + username + " not found"));
-    }
+
 
     /**
      * Loads a loan with a database write lock so concurrent status changes on the same loan are serialised.
