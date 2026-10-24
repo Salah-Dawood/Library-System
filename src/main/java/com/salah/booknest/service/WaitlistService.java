@@ -15,8 +15,10 @@ import com.salah.booknest.repository.BookRepository;
 import com.salah.booknest.repository.InventoryRepository;
 import com.salah.booknest.repository.LoanRepository;
 import com.salah.booknest.repository.WaitlistRepository;
+import com.salah.booknest.security.Roles;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -71,5 +73,56 @@ public class WaitlistService {
         int position = (int) waitlistRepository.countByBookIdAndStatus(book.getId(), WaitlistStatus.WAITING);
         log.info("User {} joined the waitlist of book {} at position {}", user.getId(), book.getId(), position);
         return WaitlistResponse.from(entry, position);
+    }
+
+    @Transactional
+    public WaitlistResponse leave(Long entryId, Authentication authentication) {
+        WaitlistEntry entry = findEntry(entryId);
+        checkOwner(entry, authentication);
+        if (entry.getStatus() != WaitlistStatus.WAITING) {
+            throw new InvalidStateException("You are not waiting for this book anymore");
+        }
+
+        entry.setStatus(WaitlistStatus.CANCELLED);
+        auditLogService.log("WAITLIST", "LEFT", entryId);
+        log.info("Waitlist entry {} was cancelled by {}", entryId, authentication.getName());
+        return WaitlistResponse.from(entry, 0);
+    }
+
+    @Transactional(readOnly = true)
+    public WaitlistResponse getEntry(Long entryId, Authentication authentication) {
+        WaitlistEntry entry = findEntry(entryId);
+        checkOwner(entry, authentication);
+        return toResponse(entry);
+    }
+
+    @Transactional(readOnly = true)
+    public List<WaitlistResponse> getMyWaitlist(Authentication authentication) {
+        User user = appSharedService.getUserFromAuth(authentication);
+        List<WaitlistEntry> entries =
+                waitlistRepository.findAllByUserIdAndStatusOrderByIdAsc(user.getId(), WaitlistStatus.WAITING);
+        return entries.stream().map(this::toResponse).toList();
+    }
+
+    private WaitlistEntry findEntry(Long entryId) {
+        return waitlistRepository.findById(entryId)
+                .orElseThrow(() -> new InformationNotFoundException("Waitlist entry with ID " + entryId + " not found"));
+    }
+
+    private void checkOwner(WaitlistEntry entry, Authentication authentication) {
+        boolean owner = entry.getUser().getUsername().equals(authentication.getName());
+        if (!owner && !Roles.isLibrarian(authentication)) {
+            throw new AccessDeniedException("This is not your waitlist entry");
+        }
+    }
+
+    // position 1 means next in line, 0 means not waiting anymore
+    private WaitlistResponse toResponse(WaitlistEntry entry) {
+        if (entry.getStatus() != WaitlistStatus.WAITING) {
+            return WaitlistResponse.from(entry, 0);
+        }
+        long ahead = waitlistRepository.countByBookIdAndStatusAndIdLessThan(
+                entry.getBook().getId(), WaitlistStatus.WAITING, entry.getId());
+        return WaitlistResponse.from(entry, (int) ahead + 1);
     }
 }

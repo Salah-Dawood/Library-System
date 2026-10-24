@@ -14,6 +14,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @Tag(name = "Waitlist", description = "Members wait in line for a book that has no free copies.")
 @RestController
 @RequestMapping("/api/waitlist")
@@ -32,5 +34,32 @@ public class WaitlistController {
     public ResponseEntity<WaitlistResponse> join(Authentication authentication,
                                                  @Valid @RequestBody WaitlistRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(waitlistService.join(authentication, request));
+    }
+
+    @Operation(summary = "List my waitlist", description = "The books I am waiting for, with my position in each line.")
+    @GetMapping("/my")
+    public List<WaitlistResponse> getMyWaitlist(Authentication authentication) {
+        return waitlistService.getMyWaitlist(authentication);
+    }
+
+    @Operation(summary = "Get a waitlist entry", description = "Shows the current position (0 if no longer waiting). Only the owner or a librarian.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "403", description = "Not your waitlist entry"),
+            @ApiResponse(responseCode = "404", description = "No waitlist entry with this id")
+    })
+    @GetMapping("/{entryId}")
+    public WaitlistResponse getEntry(@PathVariable Long entryId, Authentication authentication) {
+        return waitlistService.getEntry(entryId, authentication);
+    }
+
+    @Operation(summary = "Leave the waitlist", description = "Everyone behind you moves up one place. Only the owner or a librarian.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "403", description = "Not your waitlist entry"),
+            @ApiResponse(responseCode = "404", description = "No waitlist entry with this id"),
+            @ApiResponse(responseCode = "409", description = "You are not waiting anymore")
+    })
+    @DeleteMapping("/{entryId}")
+    public WaitlistResponse leave(@PathVariable Long entryId, Authentication authentication) {
+        return waitlistService.leave(entryId, authentication);
     }
 }
