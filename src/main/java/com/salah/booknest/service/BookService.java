@@ -36,6 +36,7 @@ public class BookService {
     private final ReviewRepository reviewRepository;
     private final LoanRepository loanRepository;
     private final AuditLogService auditLogService;
+    private final WaitlistService waitlistService;
 
     public BookService(BookRepository bookRepository,
                        GenreRepository genreRepository,
@@ -43,7 +44,8 @@ public class BookService {
                        InventoryRepository inventoryRepository,
                        ReviewRepository reviewRepository,
                        LoanRepository loanRepository,
-                       AuditLogService auditLogService) {
+                       AuditLogService auditLogService,
+                       WaitlistService waitlistService) {
         this.bookRepository = bookRepository;
         this.genreRepository = genreRepository;
         this.authorRepository = authorRepository;
@@ -51,6 +53,7 @@ public class BookService {
         this.reviewRepository = reviewRepository;
         this.loanRepository = loanRepository;
         this.auditLogService = auditLogService;
+        this.waitlistService = waitlistService;
     }
 
     /**
@@ -244,6 +247,7 @@ public class BookService {
         }
 
         book.setActive(false);
+        waitlistService.cancelAllForBook(bookId);
         auditLogService.log("BOOK", "DEACTIVATED", bookId);
     }
 
