@@ -23,6 +23,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Slf4j
@@ -102,6 +103,20 @@ public class WaitlistService {
         List<WaitlistEntry> entries =
                 waitlistRepository.findAllByUserIdAndStatusOrderByIdAsc(user.getId(), WaitlistStatus.WAITING);
         return entries.stream().map(this::toResponse).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<WaitlistResponse> getQueueForBook(Long bookId) {
+        if (!bookRepository.existsById(bookId)) {
+            throw new InformationNotFoundException("Book with ID " + bookId + " not found");
+        }
+        List<WaitlistEntry> entries =
+                waitlistRepository.findAllByBookIdAndStatusOrderByIdAsc(bookId, WaitlistStatus.WAITING);
+        List<WaitlistResponse> queue = new ArrayList<>();
+        for (int i = 0; i < entries.size(); i++) {
+            queue.add(WaitlistResponse.from(entries.get(i), i + 1));
+        }
+        return queue;
     }
 
     private WaitlistEntry findEntry(Long entryId) {

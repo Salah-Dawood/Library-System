@@ -11,6 +11,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -61,5 +62,15 @@ public class WaitlistController {
     @DeleteMapping("/{entryId}")
     public WaitlistResponse leave(@PathVariable Long entryId, Authentication authentication) {
         return waitlistService.leave(entryId, authentication);
+    }
+
+    @Operation(summary = "List the waitlist of a book", description = "Everyone waiting for the book, first in line first. Librarian only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "404", description = "No book with this id")
+    })
+    @GetMapping("/book/{bookId}")
+    @PreAuthorize("hasRole('librarian')")
+    public List<WaitlistResponse> getQueueForBook(@PathVariable Long bookId) {
+        return waitlistService.getQueueForBook(bookId);
     }
 }
