@@ -37,7 +37,7 @@ public class WaitlistController {
         return ResponseEntity.status(HttpStatus.CREATED).body(waitlistService.join(authentication, request));
     }
 
-    @Operation(summary = "List my waitlist", description = "The books I am waiting for, with my position in each line.")
+    @Operation(summary = "List my waitlist", description = "The books I am waiting for, with my position in each line. A hold has position 0 and a holdExpiresAt date.")
     @GetMapping("/my")
     public List<WaitlistResponse> getMyWaitlist(Authentication authentication) {
         return waitlistService.getMyWaitlist(authentication);
@@ -64,7 +64,7 @@ public class WaitlistController {
         return waitlistService.leave(entryId, authentication);
     }
 
-    @Operation(summary = "List the waitlist of a book", description = "Everyone waiting for the book, first in line first. Librarian only.")
+    @Operation(summary = "List the waitlist of a book", description = "Everyone waiting for the book, first in line first. Members holding a copy come first with position 0. Librarian only.")
     @ApiResponses({
             @ApiResponse(responseCode = "404", description = "No book with this id")
     })

@@ -9,7 +9,7 @@ import java.util.Optional;
 
 public interface WaitlistRepository extends JpaRepository<WaitlistEntry, Long> {
 
-    boolean existsByUserIdAndBookIdAndStatus(Long userId, Long bookId, WaitlistStatus status);
+    boolean existsByUserIdAndBookIdAndStatusIn(Long userId, Long bookId, List<WaitlistStatus> statuses);
 
     long countByUserIdAndStatus(Long userId, WaitlistStatus status);
 
@@ -19,9 +19,9 @@ public interface WaitlistRepository extends JpaRepository<WaitlistEntry, Long> {
 
     long countByBookIdAndStatusAndIdLessThan(Long bookId, WaitlistStatus status, Long id);
 
-    List<WaitlistEntry> findAllByUserIdAndStatusOrderByIdAsc(Long userId, WaitlistStatus status);
+    List<WaitlistEntry> findAllByUserIdAndStatusInOrderByIdAsc(Long userId, List<WaitlistStatus> statuses);
 
-    List<WaitlistEntry> findAllByBookIdAndStatusOrderByIdAsc(Long bookId, WaitlistStatus status);
+    List<WaitlistEntry> findAllByBookIdAndStatusInOrderByIdAsc(Long bookId, List<WaitlistStatus> statuses);
 
     List<WaitlistEntry> findAllByBookIdAndStatus(Long bookId, WaitlistStatus status);
 }

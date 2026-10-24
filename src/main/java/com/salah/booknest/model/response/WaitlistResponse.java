@@ -13,6 +13,7 @@ public record WaitlistResponse(
         String username,
         WaitlistStatus status,
         int position,
+        LocalDateTime holdExpiresAt,
         LocalDateTime joinedAt) {
 
     public static WaitlistResponse from(WaitlistEntry entry, int position) {
@@ -24,6 +25,7 @@ public record WaitlistResponse(
                 entry.getUser().getUsername(),
                 entry.getStatus(),
                 position,
+                entry.getHoldExpiresAt(),
                 entry.getJoinedAt());
     }
 }

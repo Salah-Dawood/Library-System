@@ -38,6 +38,8 @@ import java.util.Optional;
 public class WaitlistService {
 
     private static final int MAX_WAITING = 5;
+    private static final List<WaitlistStatus> ACTIVE_STATUSES =
+            List.of(WaitlistStatus.WAITING, WaitlistStatus.HOLD_READY);
 
     private final WaitlistRepository waitlistRepository;
     private final BookRepository bookRepository;
@@ -47,7 +49,7 @@ public class WaitlistService {
     private final AppSharedService appSharedService;
     private final NotificationService notificationService;
 
-    @Value("${app.holds.hours}")
+    @Value("${app.holds.hours:24}")
     private int holdHours;
 
     @Transactional
@@ -68,7 +70,7 @@ public class WaitlistService {
         if (loanRepository.existsByUserIdAndBookIdAndStatusIn(user.getId(), book.getId(), List.of(LoanStatus.BORROWED))) {
             throw new InformationExistException("You already have this book on loan");
         }
-        if (waitlistRepository.existsByUserIdAndBookIdAndStatus(user.getId(), book.getId(), WaitlistStatus.WAITING)) {
+        if (waitlistRepository.existsByUserIdAndBookIdAndStatusIn(user.getId(), book.getId(), ACTIVE_STATUSES)) {
             throw new InformationExistException("You are already on the waitlist for this book");
         }
         if (waitlistRepository.countByUserIdAndStatus(user.getId(), WaitlistStatus.WAITING) >= MAX_WAITING) {
@@ -111,7 +113,7 @@ public class WaitlistService {
     public List<WaitlistResponse> getMyWaitlist(Authentication authentication) {
         User user = appSharedService.getUserFromAuth(authentication);
         List<WaitlistEntry> entries =
-                waitlistRepository.findAllByUserIdAndStatusOrderByIdAsc(user.getId(), WaitlistStatus.WAITING);
+                waitlistRepository.findAllByUserIdAndStatusInOrderByIdAsc(user.getId(), ACTIVE_STATUSES);
         return entries.stream().map(this::toResponse).toList();
     }
 
@@ -121,10 +123,16 @@ public class WaitlistService {
             throw new InformationNotFoundException("Book with ID " + bookId + " not found");
         }
         List<WaitlistEntry> entries =
-                waitlistRepository.findAllByBookIdAndStatusOrderByIdAsc(bookId, WaitlistStatus.WAITING);
+                waitlistRepository.findAllByBookIdAndStatusInOrderByIdAsc(bookId, ACTIVE_STATUSES);
         List<WaitlistResponse> queue = new ArrayList<>();
-        for (int i = 0; i < entries.size(); i++) {
-            queue.add(WaitlistResponse.from(entries.get(i), i + 1));
+        int position = 0;
+        for (WaitlistEntry entry : entries) {
+            if (entry.getStatus() == WaitlistStatus.WAITING) {
+                position++;
+                queue.add(WaitlistResponse.from(entry, position));
+            } else {
+                queue.add(WaitlistResponse.from(entry, 0));
+            }
         }
         return queue;
     }

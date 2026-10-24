@@ -56,6 +56,7 @@ public class LoanService {
     private final NotificationService notificationService;
     private final AuditLogService auditLogService;
     private final AppSharedService appSharedService;
+    private final WaitlistService waitlistService;
 
 
     /**
@@ -332,12 +333,11 @@ public class LoanService {
     }
 
     /**
-     * Adds one copy back to the book inventory, never going above the total number of copies.
+     * A copy came back. It is held for the first member in line, or put back in stock if nobody is waiting.
      */
     private void giveCopyBack(Long bookId) {
         Inventory inventory = getInventoryForUpdate(bookId);
-        // Never exceed the stock, even if the data was edited by hand.
-        inventory.setAvailableCopies(Math.min(inventory.getTotalCopies(), inventory.getAvailableCopies() + 1));
+        waitlistService.offerCopy(inventory);
     }
 
     /**
