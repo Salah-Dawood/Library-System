@@ -9,4 +9,6 @@ public interface WaitlistRepository extends JpaRepository<WaitlistEntry, Long> {
     boolean existsByUserIdAndBookIdAndStatus(Long userId, Long bookId, WaitlistStatus status);
 
     long countByUserIdAndStatus(Long userId, WaitlistStatus status);
+
+    long countByBookIdAndStatus(Long bookId, WaitlistStatus status);
 }
