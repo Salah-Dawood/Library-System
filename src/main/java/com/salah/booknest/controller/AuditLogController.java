@@ -25,14 +25,14 @@ public class AuditLogController {
         this.auditLogService = auditLogService;
     }
 
-    @Operation(summary = "List audit entries (paged)", description = "Newest first by default. Filter by entry type (USER, BOOK, LOAN or REVIEW) and/or by the id of the user who acted. Sort by id, timestamp, type, userId or action. Page size is capped at 100. Librarian only.")
+    @Operation(summary = "List audit entries (paged)", description = "Newest first by default. Filter by entry type (USER, BOOK, LOAN, FINE, REVIEW or WAITLIST) and/or by the id of the user who acted. Sort by id, timestamp, type, userId or action. Page size is capped at 100. Librarian only.")
     @ApiResponses({
             @ApiResponse(responseCode = "400", description = "Unknown sortBy field")
     })
     @GetMapping("")
     @PreAuthorize("hasRole('librarian')")
     public Page<AuditLogResponse> getAuditLogs(
-            @Parameter(description = "USER, BOOK, LOAN or REVIEW") @RequestParam(required = false) String type,
+            @Parameter(description = "USER, BOOK, LOAN, FINE, REVIEW or WAITLIST") @RequestParam(required = false) String type,
             @Parameter(description = "Id of the user who performed the action") @RequestParam(required = false) Long userId,
             @Parameter(description = "Page number, starting at 0") @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "Entries per page (1 to 100)") @RequestParam(defaultValue = "10") int size,

@@ -19,4 +19,6 @@ public interface WaitlistRepository extends JpaRepository<WaitlistEntry, Long> {
     List<WaitlistEntry> findAllByUserIdAndStatusOrderByIdAsc(Long userId, WaitlistStatus status);
 
     List<WaitlistEntry> findAllByBookIdAndStatusOrderByIdAsc(Long bookId, WaitlistStatus status);
+
+    List<WaitlistEntry> findAllByBookIdAndStatus(Long bookId, WaitlistStatus status);
 }

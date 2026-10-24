@@ -119,6 +119,14 @@ public class WaitlistService {
         return queue;
     }
 
+    @Transactional
+    public void cancelAllForBook(Long bookId) {
+        List<WaitlistEntry> entries = waitlistRepository.findAllByBookIdAndStatus(bookId, WaitlistStatus.WAITING);
+        for (WaitlistEntry entry : entries) {
+            entry.setStatus(WaitlistStatus.CANCELLED);
+        }
+    }
+
     private WaitlistEntry findEntry(Long entryId) {
         return waitlistRepository.findById(entryId)
                 .orElseThrow(() -> new InformationNotFoundException("Waitlist entry with ID " + entryId + " not found"));
