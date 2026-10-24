@@ -10,6 +10,7 @@ import com.salah.booknest.model.User;
 import com.salah.booknest.model.WaitlistEntry;
 import com.salah.booknest.model.WaitlistStatus;
 import com.salah.booknest.model.request.WaitlistRequest;
+import com.salah.booknest.model.response.NotificationEvent;
 import com.salah.booknest.model.response.WaitlistResponse;
 import com.salah.booknest.repository.BookRepository;
 import com.salah.booknest.repository.InventoryRepository;
@@ -18,13 +19,18 @@ import com.salah.booknest.repository.WaitlistRepository;
 import com.salah.booknest.security.Roles;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -39,6 +45,10 @@ public class WaitlistService {
     private final LoanRepository loanRepository;
     private final AuditLogService auditLogService;
     private final AppSharedService appSharedService;
+    private final NotificationService notificationService;
+
+    @Value("${app.holds.hours}")
+    private int holdHours;
 
     @Transactional
     public WaitlistResponse join(Authentication authentication, WaitlistRequest request) {
@@ -127,6 +137,26 @@ public class WaitlistService {
         }
     }
 
+    // a copy came back: hold it for the first person in line, or back on the shelf
+    @Transactional
+    public void offerCopy(Inventory inventory) {
+        Long bookId = inventory.getBook().getId();
+        Optional<WaitlistEntry> first =
+                waitlistRepository.findFirstByBookIdAndStatusOrderByIdAsc(bookId, WaitlistStatus.WAITING);
+        if (first.isEmpty()) {
+            inventory.setAvailableCopies(Math.min(inventory.getTotalCopies(), inventory.getAvailableCopies() + 1));
+            return;
+        }
+
+        WaitlistEntry entry = first.get();
+        entry.setStatus(WaitlistStatus.HOLD_READY);
+        entry.setHoldExpiresAt(LocalDateTime.now().plusHours(holdHours));
+        auditLogService.log("WAITLIST", "HOLD_STARTED", entry.getId());
+        log.info("Copy of book {} is held for user {} until {}", bookId, entry.getUser().getId(), entry.getHoldExpiresAt());
+        notifyMember(entry, "HOLD_READY", "A copy of \"" + entry.getBook().getTitle()
+                + "\" is held for you for " + holdHours + " hours. Claim it before it expires");
+    }
+
     private WaitlistEntry findEntry(Long entryId) {
         return waitlistRepository.findById(entryId)
                 .orElseThrow(() -> new InformationNotFoundException("Waitlist entry with ID " + entryId + " not found"));
@@ -137,6 +167,21 @@ public class WaitlistService {
         if (!owner && !Roles.isLibrarian(authentication)) {
             throw new AccessDeniedException("This is not your waitlist entry");
         }
+    }
+
+    private void notifyMember(WaitlistEntry entry, String type, String message) {
+        String username = entry.getUser().getUsername();
+        NotificationEvent event = new NotificationEvent(type, message, null, null, LocalDateTime.now());
+        afterCommit(() -> notificationService.notifyUser(username, event));
+    }
+
+    private void afterCommit(Runnable action) {
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                action.run();
+            }
+        });
     }
 
     // position 1 means next in line, 0 means not waiting anymore

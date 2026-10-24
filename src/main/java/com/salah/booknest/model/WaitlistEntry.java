@@ -34,4 +34,7 @@ public class WaitlistEntry {
     @CreationTimestamp
     @Column(name = "joined_at")
     private LocalDateTime joinedAt;
+
+    @Column(name = "hold_expires_at")
+    private LocalDateTime holdExpiresAt;
 }
