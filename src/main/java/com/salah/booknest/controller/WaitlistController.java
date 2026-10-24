@@ -1,7 +1,9 @@
 package com.salah.booknest.controller;
 
 import com.salah.booknest.model.request.WaitlistRequest;
+import com.salah.booknest.model.response.LoanResponse;
 import com.salah.booknest.model.response.WaitlistResponse;
+import com.salah.booknest.service.LoanService;
 import com.salah.booknest.service.WaitlistService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -24,6 +26,7 @@ import java.util.List;
 public class WaitlistController {
 
     private final WaitlistService waitlistService;
+    private final LoanService loanService;
 
     @Operation(summary = "Join the waitlist for a book", description = "Only works when the book has no free copies. You can wait for at most 5 books and once per book. The position is your place in line, 1 means next.")
     @ApiResponses({
@@ -53,7 +56,7 @@ public class WaitlistController {
         return waitlistService.getEntry(entryId, authentication);
     }
 
-    @Operation(summary = "Leave the waitlist", description = "Everyone behind you moves up one place. Only the owner or a librarian.")
+    @Operation(summary = "Leave the waitlist", description = "Everyone behind you moves up one place. If a copy is held for you it goes to the next person. Only the owner or a librarian.")
     @ApiResponses({
             @ApiResponse(responseCode = "403", description = "Not your waitlist entry"),
             @ApiResponse(responseCode = "404", description = "No waitlist entry with this id"),
@@ -62,6 +65,21 @@ public class WaitlistController {
     @DeleteMapping("/{entryId}")
     public WaitlistResponse leave(@PathVariable Long entryId, Authentication authentication) {
         return waitlistService.leave(entryId, authentication);
+    }
+
+    @Operation(summary = "Claim my hold", description = "Borrows the copy that is held for you. days is the loan length, 1 to 30 (default 14).")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Copy borrowed"),
+            @ApiResponse(responseCode = "400", description = "Loan length is not between 1 and 30 days"),
+            @ApiResponse(responseCode = "403", description = "Not your hold"),
+            @ApiResponse(responseCode = "404", description = "No waitlist entry with this id"),
+            @ApiResponse(responseCode = "409", description = "No hold to claim, the hold expired, or you already have 5 books on loan")
+    })
+    @PostMapping("/{entryId}/claim")
+    public ResponseEntity<LoanResponse> claim(@PathVariable Long entryId,
+                                              @RequestParam(defaultValue = "14") int days,
+                                              Authentication authentication) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(loanService.claimHold(entryId, days, authentication));
     }
 
     @Operation(summary = "List the waitlist of a book", description = "Everyone waiting for the book, first in line first. Members holding a copy come first with position 0. Librarian only.")

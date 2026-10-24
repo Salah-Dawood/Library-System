@@ -4,6 +4,7 @@ import com.salah.booknest.model.WaitlistEntry;
 import com.salah.booknest.model.WaitlistStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -22,6 +23,8 @@ public interface WaitlistRepository extends JpaRepository<WaitlistEntry, Long> {
     List<WaitlistEntry> findAllByUserIdAndStatusInOrderByIdAsc(Long userId, List<WaitlistStatus> statuses);
 
     List<WaitlistEntry> findAllByBookIdAndStatusInOrderByIdAsc(Long bookId, List<WaitlistStatus> statuses);
+
+    List<WaitlistEntry> findAllByStatusAndHoldExpiresAtBefore(WaitlistStatus status, LocalDateTime time);
 
     List<WaitlistEntry> findAllByBookIdAndStatus(Long bookId, WaitlistStatus status);
 }

@@ -127,17 +127,7 @@ public class LoanService {
         }
         inventory.setAvailableCopies(inventory.getAvailableCopies() - 1);
 
-        LocalDate today = LocalDate.now();
-        Loan loan = new Loan();
-        loan.setUser(user);
-        loan.setBook(book);
-        loan.setStatus(LoanStatus.BORROWED);
-        loan.setRequestedDays(days);
-        loan.setLoanDate(today);
-        loan.setDueDate(today.plusDays(days));
-        loan = loanRepository.save(loan);
-
-        auditLogService.log("LOAN", "BORROWED", loan.getId());
+        Loan loan = createLoan(user, book, days);
         return LoanResponse.from(loan);
     }
 
@@ -271,6 +261,41 @@ public class LoanService {
     }
 
 
+    /**
+     * Borrows the copy that is held for the logged-in member. The copy was never put back in stock,
+     * so the inventory does not change; the waitlist entry becomes FULFILLED and a loan is created.
+     *
+     * @throws InvalidRequestException if the duration is not 1 to 30 days
+     * @throws AccessDeniedException if the hold belongs to someone else
+     * @throws InvalidStateException if there is no hold, it has expired, or the member already has 5 books on loan
+     */
+    @Transactional
+    public LoanResponse claimHold(Long entryId, int days, Authentication authentication) {
+        if (days < 1 || days > MAX_LOAN_DAYS) {
+            throw new InvalidRequestException("Loan duration must be between 1 and " + MAX_LOAN_DAYS + " days");
+        }
+        WaitlistEntry entry = waitlistService.getEntryLocked(entryId);
+        if (!entry.getUser().getUsername().equals(authentication.getName())) {
+            throw new AccessDeniedException("This is not your hold");
+        }
+        if (entry.getStatus() != WaitlistStatus.HOLD_READY) {
+            throw new InvalidStateException("There is no hold to claim for this waitlist entry");
+        }
+        if (entry.getHoldExpiresAt().isBefore(LocalDateTime.now())) {
+            throw new InvalidStateException("Your hold has expired");
+        }
+        User user = entry.getUser();
+        if (loanRepository.countByUserIdAndStatusIn(user.getId(), ACTIVE_STATUSES) >= MAX_ACTIVE_LOANS) {
+            throw new InvalidStateException("You can have at most " + MAX_ACTIVE_LOANS + " books on loan");
+        }
+
+        entry.setStatus(WaitlistStatus.FULFILLED);
+        Loan loan = createLoan(user, entry.getBook(), days);
+        auditLogService.log("WAITLIST", "CLAIMED", entryId);
+        return LoanResponse.from(loan);
+    }
+
+
     @Transactional(readOnly = true)
     public ReturnStats getMyStats(Authentication authentication) {
         return getStats((appSharedService.getUserFromAuth(authentication)).getId());
@@ -315,6 +340,21 @@ public class LoanService {
     private Inventory getInventoryForUpdate(Long bookId) {
         return inventoryRepository.findByBookIdForUpdate(bookId)
                 .orElseThrow(() -> new InformationNotFoundException("Inventory for book " + bookId + " not found"));
+    }
+
+    private Loan createLoan(User user, Book book, int days) {
+        LocalDate today = LocalDate.now();
+        Loan loan = new Loan();
+        loan.setUser(user);
+        loan.setBook(book);
+        loan.setStatus(LoanStatus.BORROWED);
+        loan.setRequestedDays(days);
+        loan.setLoanDate(today);
+        loan.setDueDate(today.plusDays(days));
+        loan = loanRepository.save(loan);
+
+        auditLogService.log("LOAN", "BORROWED", loan.getId());
+        return loan;
     }
 
     private static String describeTiming(long daysLate) {
