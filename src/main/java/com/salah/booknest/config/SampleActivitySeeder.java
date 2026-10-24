@@ -8,11 +8,13 @@ import com.salah.booknest.model.Loan;
 import com.salah.booknest.model.LoanStatus;
 import com.salah.booknest.model.Review;
 import com.salah.booknest.model.User;
+import com.salah.booknest.model.WaitlistEntry;
 import com.salah.booknest.repository.BookRepository;
 import com.salah.booknest.repository.FineRepository;
 import com.salah.booknest.repository.LoanRepository;
 import com.salah.booknest.repository.ReviewRepository;
 import com.salah.booknest.repository.UserRepository;
+import com.salah.booknest.repository.WaitlistRepository;
 import com.salah.booknest.service.AuditLogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
@@ -39,6 +41,7 @@ public class SampleActivitySeeder implements CommandLineRunner {
     private final LoanRepository loanRepository;
     private final ReviewRepository reviewRepository;
     private final FineRepository fineRepository;
+    private final WaitlistRepository waitlistRepository;
     private final AuditLogService auditLogService;
     private final PlatformTransactionManager transactionManager;
 
@@ -77,6 +80,8 @@ public class SampleActivitySeeder implements CommandLineRunner {
         Book noneLeft = findBook("And Then There Were None");
         Book dune = findBook("Dune");
         Book duneMessiah = findBook("Dune Messiah");
+        Book twoTowers = findBook("The Two Towers");
+        Book orderOfPhoenix = findBook("Harry Potter and the Order of the Phoenix");
 
 
         // johnd: a reliable member. Every return was on time or early, which earns the "Reliable member" badge.
@@ -100,6 +105,16 @@ public class SampleActivitySeeder implements CommandLineRunner {
         borrowed(alex, allQuiet, 10, 2);
         returnedPendingReview(alex, fellowship, 7, 8, 0);
         cancelledByLibrarian(librarian, alex, noneLeft, 7, 3);
+
+        // two sold out books with people waiting
+        setStock(twoTowers, 1);
+        borrowed(john, twoTowers, 14, 3);
+        waiting(jane, twoTowers);
+        waiting(alex, twoTowers);
+        setStock(orderOfPhoenix, 1);
+        borrowed(alex, orderOfPhoenix, 14, 2);
+        waiting(john, orderOfPhoenix);
+        waiting(jane, orderOfPhoenix);
 
         // Reviews. Only members who returned a book can review it (see ReviewService), so every review
         // below matches a returned loan above. johnd returned "Dune" but has not reviewed it yet, so
@@ -173,6 +188,17 @@ public class SampleActivitySeeder implements CommandLineRunner {
         audit("LOAN", librarian, "CANCELLED", loan.getId());
     }
 
+    // ---- waitlist ----
+
+    private void waiting(User member, Book book) {
+        WaitlistEntry entry = new WaitlistEntry();
+        entry.setUser(member);
+        entry.setBook(book);
+        entry = waitlistRepository.save(entry);
+
+        audit("WAITLIST", member, "JOINED", entry.getId());
+    }
+
     // ---- reviews ----
 
     private void review(User member, Book book, int rating, String comment) {
@@ -214,6 +240,12 @@ public class SampleActivitySeeder implements CommandLineRunner {
         int total = Math.max(0, inventory.getTotalCopies() - 1);
         inventory.setTotalCopies(total);
         inventory.setAvailableCopies(Math.min(inventory.getAvailableCopies(), total));
+    }
+
+    private void setStock(Book book, int copies) {
+        Inventory inventory = book.getInventory();
+        inventory.setTotalCopies(copies);
+        inventory.setAvailableCopies(copies);
     }
 
     private void takeCopy(Book book) {
