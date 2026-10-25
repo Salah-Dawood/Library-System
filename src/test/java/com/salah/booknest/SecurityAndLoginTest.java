@@ -1,5 +1,6 @@
 package com.salah.booknest;
 
+import com.salah.booknest.controller.UserController;
 import com.salah.booknest.model.User;
 import com.salah.booknest.model.request.LoginRequest;
 import com.salah.booknest.security.JWTUtils;
@@ -36,6 +37,7 @@ class SecurityAndLoginTest {
     private EmailVerificationService emailVerificationService;
     private AuditLogService auditLogService;
     private UserService userService;
+    private UserController userController;
 
     @BeforeEach
     void setUp() {
@@ -60,7 +62,7 @@ class SecurityAndLoginTest {
         when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
                 .thenReturn(authentication);
 
-        var response = userService.loginUser(loginRequest("alice", "password"));
+        var response = userController.loginUser(loginRequest("alice", "password"));
 
         assertEquals(200, response.getStatusCode().value());
         assertNotNull(response.getBody());
@@ -74,7 +76,7 @@ class SecurityAndLoginTest {
         when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
                 .thenReturn(new UsernamePasswordAuthenticationToken(details, "password", details.getAuthorities()));
 
-        var response = userService.loginUser(loginRequest("alice", "password"));
+        var response = userController.loginUser(loginRequest("alice", "password"));
 
         assertEquals(403, response.getStatusCode().value());
     }

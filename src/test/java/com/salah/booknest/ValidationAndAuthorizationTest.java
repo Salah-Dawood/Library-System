@@ -66,7 +66,7 @@ class ValidationAndAuthorizationTest {
     @Test
     void librarianCanCreateAuthor() {
         authenticateAs("ROLE_librarian");
-        when(authorService.createAuthor(any(AuthorRequest.class)))
+        when(authorController.createAuthor(any(AuthorRequest.class)))
                 .thenReturn(ResponseEntity.status(HttpStatus.CREATED).build());
 
         ResponseEntity<?> response = authorController.createAuthor(new AuthorRequest());

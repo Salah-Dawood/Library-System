@@ -34,8 +34,6 @@ public class UserService {
                        @Lazy PasswordEncoder passwordEncoder,
                        JWTUtils jwtUtils,
                        @Lazy AuthenticationManager authenticationManager,
-                       @Lazy MyUserDetails myUserDetails,
-                       EmailVerificationService emailVerificationService,
                        AuditLogService auditLogService){
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
