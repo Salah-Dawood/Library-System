@@ -145,8 +145,12 @@ public class WaitlistService {
 
     @Transactional
     public void cancelAllForBook(Long bookId) {
-        List<WaitlistEntry> entries = waitlistRepository.findAllByBookIdAndStatus(bookId, WaitlistStatus.WAITING);
+        Inventory inventory = getInventoryForUpdate(bookId);
+        List<WaitlistEntry> entries = waitlistRepository.findAllByBookIdAndStatusIn(bookId, ACTIVE_STATUSES);
         for (WaitlistEntry entry : entries) {
+            if (entry.getStatus() == WaitlistStatus.HOLD_READY) {
+                inventory.setAvailableCopies(Math.min(inventory.getTotalCopies(), inventory.getAvailableCopies() + 1));
+            }
             entry.setStatus(WaitlistStatus.CANCELLED);
         }
     }

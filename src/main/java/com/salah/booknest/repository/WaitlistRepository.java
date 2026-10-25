@@ -26,5 +26,5 @@ public interface WaitlistRepository extends JpaRepository<WaitlistEntry, Long> {
 
     List<WaitlistEntry> findAllByStatusAndHoldExpiresAtBefore(WaitlistStatus status, LocalDateTime time);
 
-    List<WaitlistEntry> findAllByBookIdAndStatus(Long bookId, WaitlistStatus status);
+    List<WaitlistEntry> findAllByBookIdAndStatusIn(Long bookId, List<WaitlistStatus> statuses);
 }
