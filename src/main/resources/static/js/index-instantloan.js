@@ -486,7 +486,7 @@ function rp({ b: e }) {
               : "No reviews yet",
           ],
         }),
-        o.jsx(Sc, { bookId: e.id }),
+        e.availableCopies > 0 ? o.jsx(Sc, { bookId: e.id }) : mk(JoinWaitlist, { bookId: e.id }),
       ],
     }),
   });
@@ -1409,8 +1409,9 @@ function fp({ id: e, onLogout: t, librarian: n }) {
               }),
               o.jsx("div", {
                 className: "narrow-box",
-                children: o.jsx(Sc, { bookId: l.id }),
+                children: l.availableCopies > 0 ? o.jsx(Sc, { bookId: l.id }) : mk(JoinWaitlist, { bookId: l.id }),
               }),
+              n && l.availableCopies < 1 && mk(BookWaitlist, { bookId: l.id, onLogout: t }),
               o.jsx("h2", { className: "sec", children: "Reviews" }),
               o.jsx(kc, { bookId: l.id, librarian: n }),
             ],
@@ -1953,6 +1954,151 @@ function PendingFinesNote({ onLogout }) {
     : null;
 }
 
+const fmtWhen = (s) => (s ? String(s).replace("T", " ").slice(0, 16) : "");
+
+function JoinWaitlist({ bookId }) {
+  const [msg, setMsg] = T.useState(null),
+    [busy, setBusy] = T.useState(false),
+    [joined, setJoined] = T.useState(false),
+    join = async () => {
+      setBusy(true);
+      setMsg(null);
+      try {
+        const w = await G("/api/waitlist", { method: "POST", auth: true, body: { bookId } });
+        setJoined(true);
+        setMsg({ ok: 1, t: `You joined the waitlist. You are number ${w.position} in line.` });
+      } catch (err) {
+        setMsg({ t: err.message });
+      } finally {
+        setBusy(false);
+      }
+    };
+  return mk(
+    T.Fragment,
+    null,
+    mk("div", { className: "row" }, mk("button", { className: "primary", disabled: busy || joined, onClick: join }, "Join waitlist")),
+    msg && mk("div", { className: "msg " + (msg.ok ? "ok" : "err"), role: "alert" }, msg.t),
+  );
+}
+
+function WaitlistCard({ w, onClaim, onLeave }) {
+  const [days, setDays] = T.useState(14),
+    hold = w.status === "HOLD_READY";
+  return mk(
+    "article",
+    { className: "card" },
+    mk(
+      "div",
+      { className: "card-b" },
+      mk("h2", null, mk("a", { href: ye.book(w.bookId) }, w.bookTitle)),
+      mk(
+        "p",
+        null,
+        hold
+          ? mk("span", { className: "badge good" }, "Ready to claim")
+          : mk("span", { className: "badge" }, `Number ${w.position} in line`),
+      ),
+      mk("p", { className: "hint" }, hold ? `A copy is held for you until ${fmtWhen(w.holdExpiresAt)}` : `Joined ${fmtWhen(w.joinedAt)}`),
+      mk(
+        "div",
+        { className: "row" },
+        hold &&
+          mk(
+            "select",
+            { value: days, "aria-label": "Loan length", onChange: (e) => setDays(+e.target.value) },
+            [1, 3, 7, 14, 21, 30].map((d) => mk("option", { key: d, value: d }, `${d} days`)),
+          ),
+        hold && mk("button", { className: "primary", onClick: () => onClaim(w, days) }, "Claim copy"),
+        mk("button", { className: "ghost danger", onClick: () => onLeave(w) }, hold ? "Give up the copy" : "Leave waitlist"),
+      ),
+    ),
+  );
+}
+
+function WaitlistPage({ onLogout, tick }) {
+  const [s, reload] = ee("/api/waitlist/my", onLogout, tick),
+    [msg, setMsg] = T.useState(null),
+    run = async (action, okText) => {
+      setMsg(null);
+      try {
+        const r = await action();
+        setMsg({ ok: 1, t: okText(r) });
+      } catch (err) {
+        setMsg({ t: err.message });
+      } finally {
+        reload();
+      }
+    },
+    claim = (w, days) =>
+      run(
+        () => G(`/api/waitlist/${w.id}/claim?days=${days}`, { method: "POST", auth: true }),
+        (loan) => `Borrowed "${w.bookTitle}". Due ${loan.dueDate}.`,
+      ),
+    leave = (w) =>
+      confirm(`Leave the waitlist for "${w.bookTitle}"?`) &&
+      run(
+        () => G(`/api/waitlist/${w.id}`, { method: "DELETE", auth: true }),
+        () => `You left the waitlist for "${w.bookTitle}".`,
+      );
+  return mk(
+    "main",
+    { className: "wrap" },
+    mk(Rl),
+    mk("h1", null, "My waitlist"),
+    mk("p", { className: "sub" }, "When a copy comes back it is held for the first person in line. Claim it before the hold runs out."),
+    msg && mk("div", { className: "msg " + (msg.ok ? "ok" : "err"), role: "alert" }, msg.t),
+    mk(Le, { s, empty: "You are not waiting for any book." }),
+    mk(
+      "div",
+      { className: "grid" },
+      Array.isArray(s.data) && s.data.map((w) => mk(WaitlistCard, { key: w.id, w, onClaim: claim, onLeave: leave })),
+    ),
+  );
+}
+
+function HoldsNote({ onLogout, tick }) {
+  const [s] = ee("/api/waitlist/my", onLogout, tick),
+    ready = Array.isArray(s.data) ? s.data.filter((w) => w.status === "HOLD_READY") : [];
+  return ready.length
+    ? mk(
+        "section",
+        { className: "card" },
+        mk(
+          "div",
+          { className: "card-b" },
+          mk("h2", null, "Copy ready for you"),
+          mk(
+            "p",
+            null,
+            ready.length === 1
+              ? `A copy of "${ready[0].bookTitle}" is held for you until ${fmtWhen(ready[0].holdExpiresAt)}.`
+              : `${ready.length} copies are held for you.`,
+          ),
+          mk("button", { className: "primary", onClick: () => dt("/waitlist") }, "Claim now"),
+        ),
+      )
+    : null;
+}
+
+function BookWaitlist({ bookId, onLogout }) {
+  const [s] = ee(`/api/waitlist/book/${bookId}`, onLogout);
+  return mk(
+    T.Fragment,
+    null,
+    mk("h2", { className: "sec" }, "Waitlist"),
+    mk(Le, { s, empty: "Nobody is waiting for this book." }),
+    Array.isArray(s.data) &&
+      s.data.map((w) =>
+        mk(
+          "p",
+          { key: w.id },
+          mk("b", null, mk("a", { href: ye.user(w.userId) }, w.username)),
+          w.status === "HOLD_READY" ? ` · copy held until ${fmtWhen(w.holdExpiresAt)}` : ` · number ${w.position} in line`,
+        ),
+      ),
+  );
+}
+
 function LoanHistory({ onLogout }) {
   const [status, setStatus] = T.useState(""),
     [page, setPage] = T.useState(0),
@@ -2411,7 +2557,7 @@ function Sp({ profile: e, user: t }) {
         children: t.username[0].toUpperCase(),
       });
 }
-function Ec({ user: e, onLogout: t, children: n }) {
+function Ec({ user: e, onLogout: t, tick: tk, children: n }) {
   const [r, l] = T.useState(""),
     [i, s] = T.useState(null),
     [u, a] = T.useState(null),
@@ -2497,6 +2643,11 @@ function Ec({ user: e, onLogout: t, children: n }) {
                     }),
                     o.jsx("button", {
                       className: "ghost",
+                      onClick: () => dt("/waitlist"),
+                      children: "My waitlist",
+                    }),
+                    o.jsx("button", {
+                      className: "ghost",
                       onClick: () => dt("/fines"),
                       children: "My fines",
                     }),
@@ -2505,6 +2656,7 @@ function Ec({ user: e, onLogout: t, children: n }) {
               ],
             }),
           }),
+          mk(HoldsNote, { onLogout: t, tick: tk }),
           mk(PendingFinesNote, { onLogout: t }),
           n,
           o.jsx(tn, {
@@ -2729,6 +2881,8 @@ function Ep() {
                 ? (h = o.jsx(FinesPage, { onLogout: v, librarian: rt(t) }))
                 : w && u === "/history"
                   ? (h = o.jsx(LoanHistory, { onLogout: v }))
+              : u === "/waitlist"
+                ? (h = mk(WaitlistPage, { onLogout: v, tick: r }))
               : u === "/books"
                 ? (h = o.jsx(lp, { onLogout: v, librarian: rt(t) }))
                 : u === "/loans"
@@ -2740,8 +2894,8 @@ function Ep() {
                       : rt(t) && u === "/users"
                         ? (h = o.jsx(up, { onLogout: v }))
                         : (h = rt(t)
-                            ? o.jsx(Np, { user: t, onLogout: v })
-                            : o.jsx(jp, { user: t, onLogout: v })),
+                            ? o.jsx(Np, { user: t, onLogout: v, tick: r })
+                            : o.jsx(jp, { user: t, onLogout: v, tick: r })),
     o.jsxs(o.Fragment, {
       children: [
         h,
