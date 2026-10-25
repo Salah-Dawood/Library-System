@@ -2670,13 +2670,24 @@ function Ec({ user: e, onLogout: t, tick: tk, children: n }) {
               onSubmit: async (p) => {
                 if (p.newPassword !== p.confirm)
                   throw new Error("Passwords do not match.");
+                if (!p.currentPassword)
+                  throw new Error("Enter your current password.");
                 const g = await f("/api/member/change-password", {
                   method: "PUT",
-                  body: { newPassword: p.newPassword },
+                  body: {
+                    currentPassword: p.currentPassword,
+                    newPassword: p.newPassword,
+                  },
                 });
                 return (typeof g == "string" && g) || "Password changed.";
               },
               children: [
+                o.jsx(q, {
+                  label: "Current password",
+                  name: "currentPassword",
+                  type: "password",
+                  autoComplete: "current-password",
+                }),
                 o.jsx(q, {
                   label: "New password",
                   name: "newPassword",
