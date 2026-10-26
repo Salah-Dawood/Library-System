@@ -20,7 +20,6 @@ import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Component
-@Profile("!test")
 @Order(1)
 @RequiredArgsConstructor
 public class DatabaseSeeder implements CommandLineRunner {
