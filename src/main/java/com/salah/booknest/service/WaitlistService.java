@@ -66,7 +66,7 @@ public class WaitlistService {
         // same lock that borrow uses, so a copy can't be returned while we check
         Inventory inventory = getInventoryForUpdate(book.getId());
         if (inventory.getAvailableCopies() > 0) {
-            throw new InvalidStateException("Copies are available, borrow the book instead");
+            throw new InvalidStateException("Copies are available, borrow the book instead", "COPIES_AVAILABLE");
         }
         if (loanRepository.existsByUserIdAndBookIdAndStatusIn(user.getId(), book.getId(), List.of(LoanStatus.BORROWED))) {
             throw new InformationExistException("You already have this book on loan");
@@ -75,7 +75,7 @@ public class WaitlistService {
             throw new InformationExistException("You are already on the waitlist for this book");
         }
         if (waitlistRepository.countByUserIdAndStatus(user.getId(), WaitlistStatus.WAITING) >= MAX_WAITING) {
-            throw new InvalidStateException("You can wait for at most " + MAX_WAITING + " books");
+            throw new InvalidStateException("You can wait for at most " + MAX_WAITING + " books", "WAITLIST_LIMIT_REACHED");
         }
 
         WaitlistEntry entry = new WaitlistEntry();
