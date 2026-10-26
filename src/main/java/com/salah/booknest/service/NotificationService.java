@@ -31,10 +31,17 @@ public class NotificationService {
      */
     public SseEmitter subscribe(String username, boolean librarian) {
         SseEmitter emitter = new SseEmitter(TIMEOUT_MS);
-        emitters.computeIfAbsent(username, key -> new CopyOnWriteArrayList<>()).add(emitter);
-        if (librarian) {
-            librarians.add(username);
-        }
+        // one atomic step, so the new stream cannot be lost while this user's last stream is being removed
+        emitters.compute(username, (key, streams) -> {
+            if (streams == null) {
+                streams = new CopyOnWriteArrayList<>();
+            }
+            streams.add(emitter);
+            if (librarian) {
+                librarians.add(username);
+            }
+            return streams;
+        });
         emitter.onCompletion(() -> remove(username, emitter));
         emitter.onTimeout(() -> remove(username, emitter));
         emitter.onError(error -> remove(username, emitter));
@@ -61,7 +68,9 @@ public class NotificationService {
 
     private void send(String username, SseEmitter emitter, NotificationEvent event) {
         try {
-            emitter.send(SseEmitter.event().name(event.type()).data(event));
+            synchronized (emitter) {
+                emitter.send(SseEmitter.event().name(event.type()).data(event));
+            }
         } catch (IOException | IllegalStateException e) {
             // The client went away drop this connection
             remove(username, emitter);
@@ -72,14 +81,13 @@ public class NotificationService {
      * Forgets a closed stream; when the user has no streams left they are also removed from the librarian list.
      */
     private void remove(String username, SseEmitter emitter) {
-        List<SseEmitter> userEmitters = emitters.get(username);
-        if (userEmitters == null) {
-            return;
-        }
-        userEmitters.remove(emitter);
-        if (userEmitters.isEmpty()) {
-            emitters.remove(username);
-            librarians.remove(username);
-        }
+        emitters.computeIfPresent(username, (key, streams) -> {
+            streams.remove(emitter);
+            if (streams.isEmpty()) {
+                librarians.remove(username);
+                return null; // returning null removes the user from the map
+            }
+            return streams;
+        });
     }
 }
