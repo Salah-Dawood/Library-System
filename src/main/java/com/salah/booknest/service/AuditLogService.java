@@ -30,6 +30,9 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class AuditLogService {
 
+    //for system actions
+    private static final Long SYSTEM_USER_ID = 0L;
+
     private static final Logger AUDIT = LoggerFactory.getLogger("AUDIT LOG");
     private static final Set<String> SORTABLE_FIELDS = Set.of("id", "timestamp", "type", "userId", "action");
 
@@ -89,13 +92,13 @@ public class AuditLogService {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()
                 || authentication instanceof AnonymousAuthenticationToken) {
-            return null;
+            return SYSTEM_USER_ID;
         }
-        return userRepository.findUserByUsername(authentication.getName()).map(User::getId).orElse(null);
+        return userRepository.findUserByUsername(authentication.getName()).map(User::getId).orElse(SYSTEM_USER_ID);
     }
 
     private String describeActor(Long userId) {
-        if (userId == null) {
+        if (userId == null || SYSTEM_USER_ID.equals(userId)) {
             return "System";
         }
         return userRepository.findById(userId)
