@@ -106,7 +106,7 @@ public class LoanController {
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Book borrowed", content = @Content(schema = @Schema(implementation = LoanResponse.class))),
             @ApiResponse(responseCode = "404", description = "No book with this id"),
-            @ApiResponse(responseCode = "409", description = "No copies available, already borrowed this book, or the 5 book limit is reached")
+            @ApiResponse(responseCode = "409", description = "NO_COPIES_AVAILABLE, LOAN_LIMIT_REACHED (5 books), RESOURCE_ALREADY_EXISTS (you already have this book), or CONCURRENT_UPDATE (another request changed the same data at the same moment, try again)")
     })
     @io.swagger.v3.oas.annotations.parameters.RequestBody(content = @Content(mediaType = "application/json",
             examples = @ExampleObject(value = "{\"bookId\":1,\"duration\":14}")))

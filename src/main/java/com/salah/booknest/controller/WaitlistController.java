@@ -32,7 +32,7 @@ public class WaitlistController {
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Joined the waitlist"),
             @ApiResponse(responseCode = "404", description = "No book with this id"),
-            @ApiResponse(responseCode = "409", description = "Copies are available, you already wait for or have this book, or you wait for 5 books already")
+            @ApiResponse(responseCode = "409", description = "COPIES_AVAILABLE (borrow instead), RESOURCE_ALREADY_EXISTS (already waiting or on loan), WAITLIST_LIMIT_REACHED (5 books), or CONCURRENT_UPDATE (try again)")
     })
     @PostMapping
     public ResponseEntity<WaitlistResponse> join(Authentication authentication,
@@ -73,7 +73,7 @@ public class WaitlistController {
             @ApiResponse(responseCode = "400", description = "Loan length is not between 1 and 30 days"),
             @ApiResponse(responseCode = "403", description = "Not your hold"),
             @ApiResponse(responseCode = "404", description = "No waitlist entry with this id"),
-            @ApiResponse(responseCode = "409", description = "No hold to claim, the hold expired, or you already have 5 books on loan")
+            @ApiResponse(responseCode = "409", description = "NO_ACTIVE_HOLD, HOLD_EXPIRED, LOAN_LIMIT_REACHED (5 books), or CONCURRENT_UPDATE (try again)")
     })
     @PostMapping("/{entryId}/claim")
     public ResponseEntity<LoanResponse> claim(@PathVariable Long entryId,
