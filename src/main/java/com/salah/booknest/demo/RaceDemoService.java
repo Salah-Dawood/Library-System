@@ -51,7 +51,6 @@ public class RaceDemoService {
     private final LoanRepository loanRepository;
     private final UserRepository userRepository;
     private final BookRepository bookRepository;
-    private final ObjectMapper objectMapper;
 
     /**
      * Sets the book to one copy, then lets many threads try to take it at the same moment.
@@ -164,7 +163,7 @@ public class RaceDemoService {
     // the real borrow: it locks the member first
     private boolean safeBorrow(Authentication authentication, Long bookId, List<Long> createdLoanIds) {
         try {
-            LoanRequest request = objectMapper.convertValue(Map.of("bookId", bookId, "duration", 7), LoanRequest.class);
+            LoanRequest request = new LoanRequest(bookId, 7);
             LoanResponse loan = loanService.borrow(authentication, request);
             createdLoanIds.add(loan.id());
             return true;
