@@ -90,7 +90,8 @@ public class LoanService {
     /**
      * Borrows a book on the spot for the logged-in member, with no approval step.
      * One copy is taken out of stock right away, the loan date is today and the due date is today
-     * plus the requested days. The inventory row is locked so two members cannot take the last copy.
+     * plus the requested days. The member's own row is locked first, so requests made by one member at the same
+     * time cannot get past the 5 book limit, and the inventory row is locked so two members cannot take the last copy.
      *
      * @throws InvalidRequestException if the book id is missing or the duration is not 1 to 30 days
      * @throws InformationExistException if the member already has this book on loan
@@ -107,7 +108,7 @@ public class LoanService {
             throw new InvalidRequestException("Loan duration must be between 1 and " + MAX_LOAN_DAYS + " days");
         }
 
-        User user = appSharedService.getUserFromAuth(authentication);
+        User user = appSharedService.getUserFromAuthForUpdate(authentication);
         Book book = bookRepository.findById(request.getBookId()).orElseThrow(
                 () -> new InformationNotFoundException("Book with ID " + request.getBookId() + " not found"));
         if (!Boolean.TRUE.equals(book.getActive())) {
@@ -118,12 +119,12 @@ public class LoanService {
             throw new InformationExistException("You already have this book on loan");
         }
         if (loanRepository.countByUserIdAndStatusIn(user.getId(), ACTIVE_STATUSES) >= MAX_ACTIVE_LOANS) {
-            throw new InvalidStateException("You can have at most " + MAX_ACTIVE_LOANS + " books on loan");
+            throw new InvalidStateException("You can have at most " + MAX_ACTIVE_LOANS + " books on loan", "LOAN_LIMIT_REACHED");
         }
 
         Inventory inventory = getInventoryForUpdate(book.getId());
         if (inventory.getAvailableCopies() < 1) {
-            throw new InvalidStateException("No copies of \"" + book.getTitle() + "\" are available");
+            throw new InvalidStateException("No copies of \"" + book.getTitle() + "\" are available", "NO_COPIES_AVAILABLE");
         }
         inventory.setAvailableCopies(inventory.getAvailableCopies() - 1);
 
@@ -274,19 +275,21 @@ public class LoanService {
         if (days < 1 || days > MAX_LOAN_DAYS) {
             throw new InvalidRequestException("Loan duration must be between 1 and " + MAX_LOAN_DAYS + " days");
         }
+        // the member is locked first (same order as borrow: member, then book), so two claims cannot pass the 5 book limit together
+        appSharedService.getUserFromAuthForUpdate(authentication);
         WaitlistEntry entry = waitlistService.getEntryLocked(entryId);
         if (!entry.getUser().getUsername().equals(authentication.getName())) {
             throw new AccessDeniedException("This is not your hold");
         }
         if (entry.getStatus() != WaitlistStatus.HOLD_READY) {
-            throw new InvalidStateException("There is no hold to claim for this waitlist entry");
+            throw new InvalidStateException("There is no hold to claim for this waitlist entry", "NO_ACTIVE_HOLD");
         }
         if (entry.getHoldExpiresAt().isBefore(LocalDateTime.now())) {
-            throw new InvalidStateException("Your hold has expired");
+            throw new InvalidStateException("Your hold has expired", "HOLD_EXPIRED");
         }
         User user = entry.getUser();
         if (loanRepository.countByUserIdAndStatusIn(user.getId(), ACTIVE_STATUSES) >= MAX_ACTIVE_LOANS) {
-            throw new InvalidStateException("You can have at most " + MAX_ACTIVE_LOANS + " books on loan");
+            throw new InvalidStateException("You can have at most " + MAX_ACTIVE_LOANS + " books on loan", "LOAN_LIMIT_REACHED");
         }
 
         entry.setStatus(WaitlistStatus.FULFILLED);

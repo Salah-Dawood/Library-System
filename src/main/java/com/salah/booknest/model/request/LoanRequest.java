@@ -1,10 +1,11 @@
 package com.salah.booknest.model.request;
 
-import com.salah.booknest.model.User;
 import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 @Getter
+@AllArgsConstructor//just for race demo
 public class LoanRequest {
 
     @NotNull

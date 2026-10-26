@@ -66,12 +66,13 @@ public class FineService {
 
     @Transactional
     public FineResponse payFine(Long id, Authentication authentication){
+        // the fine row is locked, so two payments of the same fine cannot both go through
         Fine fine = fineRepository.findWithLockById(id).orElseThrow(() -> new InformationNotFoundException("Fine with ID " + id + " not found!"));
         if (!fine.getLoan().getUser().getUsername().equals(authentication.getName())) {
             throw new AccessDeniedException("You can only pay your own fines");
         }
         if (fine.getStatus() == FineStatus.PAID) {
-            throw new InvalidStateException("This fine is already paid");
+            throw new InvalidStateException("This fine is already paid", "FINE_ALREADY_PAID");
         }
 
         fine.setStatus(FineStatus.PAID);

@@ -4,6 +4,8 @@ import com.salah.booknest.model.response.ApiError;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -36,7 +38,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(InvalidStateException.class)
     public ResponseEntity<ApiError> invalidState(InvalidStateException ex, HttpServletRequest req) {
-        return build(HttpStatus.CONFLICT, "INVALID_STATE", ex.getMessage(), req);
+        return build(HttpStatus.CONFLICT, ex.getCode(), ex.getMessage(), req);
     }
 
     @ExceptionHandler(InvalidRequestException.class)
@@ -87,6 +89,15 @@ public class GlobalExceptionHandler {
         log.warn("Data integrity violation on {}: {}", req.getRequestURI(), ex.getMostSpecificCause().getMessage());
         return build(HttpStatus.CONFLICT, "DATA_CONFLICT",
                 "The request conflicts with existing data, for example the item is still in use", req);
+    }
+
+    // two requests changed the same data at the same moment and this one lost
+    @ExceptionHandler({OptimisticLockingFailureException.class, PessimisticLockingFailureException.class})
+    public ResponseEntity<ApiError> concurrentUpdate(Exception ex, HttpServletRequest req) {
+        log.warn("Concurrent update conflict on {}: {}", req.getRequestURI(), ex.getClass().getSimpleName());
+        ApiError body = new ApiError(LocalDateTime.now(), HttpStatus.CONFLICT.value(), "CONCURRENT_UPDATE",
+                "Someone else changed the same data at the same moment. Please try again", req.getRequestURI(), null);
+        return ResponseEntity.status(HttpStatus.CONFLICT).header("Retry-After", "1").body(body);
     }
 
     @ExceptionHandler(AsyncRequestNotUsableException.class)

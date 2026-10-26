@@ -254,20 +254,30 @@ public class BookService {
 
     /**
      * Changes the total number of copies while keeping the copies currently on loan unchanged:
-     * available copies become the new total minus the copies on loan.
+     * available copies become the new total minus the copies on loan. Every new copy is offered to the
+     * waitlist first, so people in line are not skipped.
      *
      * @throws InvalidRequestException if the new total is lower than the number of copies on loan
      */
     private void updateTotalCopies(Long bookId, int newTotal) {
         Inventory inventory = inventoryRepository.findByBookIdForUpdate(bookId)
                 .orElseThrow(() -> new InformationNotFoundException("Inventory for book " + bookId + " not found"));
-        int onLoan = inventory.getTotalCopies() - inventory.getAvailableCopies();
+        int oldTotal = inventory.getTotalCopies();
+        int oldAvailable = inventory.getAvailableCopies();
+        int onLoan = oldTotal - oldAvailable;
         if (newTotal < onLoan) {
             throw new InvalidRequestException(
                     "Total copies cannot be lower than the " + onLoan + " copies currently on loan");
         }
         inventory.setTotalCopies(newTotal);
-        inventory.setAvailableCopies(newTotal - onLoan);
+        if (newTotal > oldTotal) {
+            inventory.setAvailableCopies(oldAvailable);
+            for (int i = oldTotal; i < newTotal; i++) {
+                waitlistService.offerCopy(inventory);
+            }
+        } else {
+            inventory.setAvailableCopies(newTotal - onLoan);
+        }
     }
 
     //helper methods
