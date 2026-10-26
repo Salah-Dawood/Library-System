@@ -56,7 +56,7 @@ public class WaitlistService {
 
     @Transactional
     public WaitlistResponse join(Authentication authentication, WaitlistRequest request) {
-        User user = appSharedService.getUserFromAuth(authentication);
+        User user = appSharedService.getUserFromAuthForUpdate(authentication);
         Book book = bookRepository.findById(request.bookId())
                 .orElseThrow(() -> new InformationNotFoundException("Book with ID " + request.bookId() + " not found"));
         if (!book.getActive()) {

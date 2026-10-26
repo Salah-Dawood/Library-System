@@ -20,4 +20,10 @@ public class AppSharedService {
         return userRepository.findUserByUsername(username)
                 .orElseThrow(() -> new InformationNotFoundException("Username " + username + " not found"));
     }
+
+    public User getUserFromAuthForUpdate(Authentication authentication) {
+        String username = authentication.getName();
+        return userRepository.findWithLockByUsername(username)
+                .orElseThrow(() -> new InformationNotFoundException("Username " + username + " not found"));
+    }
 }
