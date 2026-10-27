@@ -49,6 +49,7 @@ public class WaitlistService {
     private final AuditLogService auditLogService;
     private final AppSharedService appSharedService;
     private final NotificationService notificationService;
+    private final AsyncEmailService asyncEmailService;
     private final EntityManager entityManager;
 
     @Value("${app.holds.hours:24}")
@@ -171,7 +172,7 @@ public class WaitlistService {
         entry.setHoldExpiresAt(LocalDateTime.now().plusHours(holdHours));
         auditLogService.log("WAITLIST", "HOLD_STARTED", entry.getId());
         log.info("Copy of book {} is held for user {} until {}", bookId, entry.getUser().getId(), entry.getHoldExpiresAt());
-        notifyMember(entry, "HOLD_READY", "A copy of \"" + entry.getBook().getTitle()
+        notifyMember(entry, "HOLD_READY", "BookNest - A copy is ready for you", "A copy of \"" + entry.getBook().getTitle()
                 + "\" is held for you for " + holdHours + " hours. Claim it before it expires");
     }
 
@@ -193,7 +194,7 @@ public class WaitlistService {
         entry.setStatus(WaitlistStatus.EXPIRED);
         auditLogService.log("WAITLIST", "EXPIRED", entryId);
         log.info("Hold {} expired for user {}", entryId, entry.getUser().getId());
-        notifyMember(entry, "HOLD_EXPIRED", "Your hold on \"" + entry.getBook().getTitle() + "\" expired");
+        notifyMember(entry, "HOLD_EXPIRED", "BookNest - Your hold expired", "Your hold on \"" + entry.getBook().getTitle() + "\" expired");
         offerCopy(getInventoryForUpdate(entry.getBook().getId()));
     }
 
@@ -223,10 +224,14 @@ public class WaitlistService {
         }
     }
 
-    private void notifyMember(WaitlistEntry entry, String type, String message) {
+    private void notifyMember(WaitlistEntry entry, String type, String subject, String message) {
         String username = entry.getUser().getUsername();
+        String email = entry.getUser().getEmailAddress();
         NotificationEvent event = new NotificationEvent(type, message, null, null, LocalDateTime.now());
-        afterCommit(() -> notificationService.notifyUser(username, event));
+        afterCommit(() -> {
+            notificationService.notifyUser(username, event);
+            asyncEmailService.sendNotificationEmail(username, email, subject, message);
+        });
     }
 
     private void afterCommit(Runnable action) {

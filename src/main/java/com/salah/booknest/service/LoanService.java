@@ -57,6 +57,7 @@ public class LoanService {
     private final AuditLogService auditLogService;
     private final AppSharedService appSharedService;
     private final WaitlistService waitlistService;
+    private final AsyncEmailService asyncEmailService;
 
 
     /**
@@ -408,8 +409,21 @@ public class LoanService {
 
     private void notifyMember(Loan loan, String type, String message) {
         String username = loan.getUser().getUsername();
+        String email = loan.getUser().getEmailAddress();
         NotificationEvent event = newEvent(loan, type, message);
-        afterCommit(() -> notificationService.notifyUser(username, event));
+        afterCommit(() -> {
+            notificationService.notifyUser(username, event);
+            asyncEmailService.sendNotificationEmail(username, email, emailSubject(type), message);
+        });
+    }
+
+    private String emailSubject(String type) {
+        return switch (type) {
+            case "LOAN_CANCELLED" -> "BookNest - Your loan was cancelled";
+            case "LOAN_RETURNED" -> "BookNest - We received your return";
+            case "RETURN_REVIEWED" -> "BookNest - Your return was reviewed";
+            default -> "BookNest - Update about your loan";
+        };
     }
 
     private void notifyLibrarians(Loan loan, String type, String message) {
