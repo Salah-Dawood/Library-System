@@ -2,7 +2,7 @@
 is a streamlined library management platform designed to simplify the book loaning process.
 The system bridges the gap between readers and library administrators by replacing manual tracking with a digital workflow that manages borrowing requests in real-time.
 
-> **Project 3 update:** borrowing is now instant with a reviewed return, plus a waitlist, thread pools and race-condition handling. [Jump to the Project 3 Update](#project-3-update-concurrency)
+> **Project 3 update:** borrowing is now instant with a reviewed return, plus a waitlist, thread pools and race-condition handling. [Jump to the Project 3 Update](#project-3-multithreading-and-thread-safety-update)
 
 
 ## Main features
@@ -256,6 +256,7 @@ configure the following environment variables that will be used by application.p
 Some requirements implemented are not system system wide, rather only implemented once to show understanding of using the feature.
 ## Major Challenges
 Had a small problem configuring a Many to Many relationship between two entities for the first time, but i found it nice that java/spring boot handles making the junction table.
+
 ## Future Improvements
 **Spread the requirements** accross the system where it would be appropriate and efficient.
 **Implement email notification** for loan status updates
@@ -267,178 +268,127 @@ Had a small problem configuring a Many to Many relationship between two entities
 * **URL:** [Google AI Mode](https://ai.google)
 * **Purpose:** Provided end-to-end architectural guidance, explained complex Java structures, and mentored on industry best practices throughout development.
 
-
 ---
 
-## Project 3 Update: Concurrency
+# Project 3: Multithreading and Thread Safety Update
 
-Project 3 extends the same application. The sections above describe the Project 2 version, so where they disagree with this section (the approval queue, the REQUESTED to APPROVED flow, the approve/reject endpoints), this section is the current behaviour.
+Project 3 builds on the same app. Where the Project 2 sections above disagree with this update (the approval queue and the approve/reject endpoints), this update is the current behaviour.
 
-### How the borrowing flow changed
+## Project 3 Changes
 
-**Before (Project 2):** a member sent a borrow request, it waited in the librarian's approval queue, and only after the librarian approved it did the book count as taken.
+**New functionality**
+* Borrowing is now instant. The librarian check moved to the end of the loan: the member returns the book, then a librarian reviews it for damage.
+* Waitlist: if a book has no copies, members can join its waitlist. When a copy comes back it is held for the first person in line for 24 hours.
+* Fines: late fines are created automatically on return, damage fines by the librarian. Members pay them.
+* Background jobs: emails are sent in the background, holds are expired every minute and a daily job reminds members about books due tomorrow.
+* Race demo (`race-demo` profile) and a new frontend with a Race lab page and an audit log page for librarians.
 
-```
-REQUESTED -> APPROVED -> returned          (or REJECTED)
-```
+**New models**
+* `WaitlistEntry`: book, user, status (`WAITING`, `HOLD_READY`, `FULFILLED`, `CANCELLED`, `EXPIRED`), hold expiry time and join time.
+* `Loan` has the new statuses `BORROWED`, `PENDING_REVIEW`, `RETURNED`, `CANCELLED` and review fields. `Fine` is linked to a loan and has a type and a status.
 
-**Now (Project 3):** borrowing is instant. The review moved from the start of the loan to the end, where it matters (is the book damaged, is the member late).
+**Concurrency-sensitive workflow:** borrow, return, review, cancel, claim a held copy, hold expiry and pay a fine. All of them change the number of copies of a book or the state of a loan, and can run at the same time as the same action from another user.
 
-```
-BORROWED -> PENDING_REVIEW -> RETURNED      (or BORROWED -> CANCELLED)
-```
+**Race condition:** two members borrowing the last copy at the same moment (more in the table below).
 
-| Step | Who | What happens |
-|------|-----|--------------|
-| Borrow | Member | The loan starts right away as `BORROWED` and one copy is taken from the shelf. No approval needed. |
-| Return | Member | The member hands the book back. The loan becomes `PENDING_REVIEW`. The system records if it was early, on time or late, and creates a late fine automatically (0.35 per day, `app.fines.late-per-day`). |
-| Review | Librarian | The librarian checks the copy (`PUT /api/loans/{id}/review-return`). Not damaged: the copy goes back on the shelf, or is held for the next person in the waitlist. Damaged: the copy is removed from circulation (the total goes down) and the librarian can add a fine. |
-| Cancel | Librarian | A loan that is still out (for example made by mistake) can be cancelled and the copy goes back. |
+**Concurrency technique:** pessimistic locking (`@Lock(PESSIMISTIC_WRITE)`, which is `SELECT ... FOR UPDATE`) inside `@Transactional` methods.
 
-Why: an instant borrow means two members can really go for the last copy at the same moment, which is the concurrency problem this project is about.
+**Database consistency:** every operation is one transaction, and this rule must always hold for a book: `total copies = copies on the shelf + copies on loan + copies held for the waitlist`. Emails and notifications are sent only after the transaction commits.
 
-### What is new
+**Asynchronous processing**
+* `notificationExecutor`: thread pool for `@Async` emails, so a request does not wait for the mail server.
+* `holdExpiryExecutor`: fixed pool with `Callable` and `Future`, used by the job that expires holds.
+* `DueReminderJob`: `CompletableFuture.allOf` for the daily reminder emails.
 
-* **Waitlist with holds:** when a book has no copies, a member can join its waitlist (max 5 books per member). When a copy comes back it is **held for the first member in line** (24 hours, `app.holds.hours`) and is not put back on the shelf, so someone else cannot grab it. The member claims it, or the hold expires and the copy goes to the next person.
-* **Fines:** late fines are created on return, damage fines by the librarian on review, and members pay them with `PUT /api/fines/{id}/pay`.
-* **Live notifications (SSE):** new events `LOAN_RETURNED`, `RETURN_REVIEWED`, `LOAN_CANCELLED`, `HOLD_READY` and `HOLD_EXPIRED`.
-* **Background work:** emails are sent in the background, a job expires old holds, and a daily job emails members whose book is due tomorrow.
-* **New entity:** `WaitlistEntry` (`WAITING`, `HOLD_READY`, `FULFILLED`, `CANCELLED`, `EXPIRED`). The application now has 11 entities.
+## Concurrency Explanation
 
-#### New and changed endpoints
+**Where it happens:** the server handles each request on its own thread, so two members can borrow the same book at the same time. The hold-expiry job also runs at the same time as members.
 
-| Method | Endpoint | Description | Access |
-|--------|----------|-------------|--------|
-| POST | `/api/loans` | Borrow a book, instant (`bookId`, `duration` 1-30 days) | User |
-| PUT | `/api/loans/{loanId}/return` | Hand the book back, waits for review | User |
-| GET | `/api/loans/returns-review` | Returns waiting for review | Librarian |
-| PUT | `/api/loans/{loanId}/review-return` | Review a return (`damaged`, `notes`, `fineAmount`) | Librarian |
-| PUT | `/api/loans/{loanId}/cancel` | Cancel a loan that is still out | Librarian |
-| POST | `/api/waitlist` | Join the waitlist of a book | User |
-| GET | `/api/waitlist/my` | My waitlist entries | User |
-| GET | `/api/waitlist/{entryId}` | One entry with its position | User |
-| DELETE | `/api/waitlist/{entryId}` | Leave the waitlist | User |
-| POST | `/api/waitlist/{entryId}/claim?days=` | Claim the copy held for me | User |
-| GET | `/api/waitlist/book/{bookId}` | The queue of a book | Librarian |
-| GET | `/api/fines/my-fines` | My fines | User |
-| PUT | `/api/fines/{id}/pay` | Pay a fine | User |
-| GET | `/api/fines` | All fines | Librarian |
-| GET | `/api/fines/user/{id}` | A user's fines | Librarian |
-| POST | `/api/demo/race/{bookId}` | Race demo (only with the `race-demo` profile) | User |
-| POST | `/api/demo/race/loan-limit/{username}` | Loan limit race demo (only with the `race-demo` profile) | User |
-
-The old `approve` and `reject` endpoints no longer exist.
-
-#### Business error codes (HTTP 409 unless noted)
-
-| Code | Meaning |
-|------|---------|
-| `NO_COPIES_AVAILABLE` | Someone else took the last copy |
-| `LOAN_LIMIT_REACHED` | The member already has 5 books on loan |
-| `COPIES_AVAILABLE` | Tried to join a waitlist while copies are available, borrow instead |
-| `WAITLIST_LIMIT_REACHED` | The member is already waiting for 5 books |
-| `NO_ACTIVE_HOLD` | There is no hold to claim (already claimed, cancelled or not at the front yet) |
-| `HOLD_EXPIRED` | The hold ran out before it was claimed |
-| `FINE_ALREADY_PAID` | The fine was already paid |
-| `CONCURRENT_UPDATE` | Two requests changed the same data at the same moment, try again (comes with a `Retry-After` header) |
-
-### Race condition 1: the last copy of a book
-
-**Shared resource:** the `inventory` row of a book (`availableCopies`).
-
-**Why requests happen at the same time:** the server handles every HTTP request on its own thread. Two members can press Borrow on the same book in the same millisecond, and both requests read and change the same row.
-
-**The race (book with 1 copy left):**
+**What goes wrong without control** (1 copy left):
 
 | Time | Member A | Member B |
 |------|----------|----------|
 | 1 | reads `availableCopies = 1` | |
 | 2 | | reads `availableCopies = 1` |
-| 3 | 1 > 0, ok. writes `0` | |
-| 4 | | 1 > 0, ok (old value). writes `0` |
-| 5 | loan created | loan created |
+| 3 | writes `0`, loan created | |
+| 4 | | still thinks it is 1, writes `0`, loan created |
 
-**Wrong result without control:** two loans for one physical copy, the stock is out of sync and the library has promised a book it does not have. With more threads the stock can even go negative.
+Two loans for one copy, and the stock is wrong.
 
-**How it is prevented:** the borrow runs in a transaction and takes a **pessimistic write lock** on the inventory row (`SELECT ... FOR UPDATE`, `@Lock(PESSIMISTIC_WRITE)`). The second request waits at the lock until the first one commits, then reads the new value `0` and fails with `409 NO_COPIES_AVAILABLE`. Result: A gets `201 Created`, B gets `409 Conflict`.
+**How it is prevented:** the borrow locks the inventory row first. B waits until A commits, then sees `0` and gets `409 NO_COPIES_AVAILABLE`. One lock helper, `InventoryLocker`, is used everywhere stock changes. It also re-reads the row after locking, because Hibernate can hold an old copy in memory.
 
-**Why this approach:** the lock is done by the database, so it works for any number of threads and any number of app instances, which a Java `synchronized` block would not. Optimistic locking (`@Version`) would make the losers fail with errors and need retries, while with the lock they simply wait and then get a clear business answer.
+**Why this approach:** the database does the locking, so it works with any number of threads or servers (a Java `synchronized` would not). Waiting is simpler than optimistic locking, where the losers would fail and need a retry. Locks are always taken member first, then book, so two requests cannot deadlock.
 
-**A detail that caused a real bug:** a book is loaded together with its inventory, so Hibernate can already hold an old copy of the inventory in memory when the lock is taken. The lock query then waits, but the object still shows the old numbers. `InventoryLocker` fixes this: it takes the lock and then re-reads the row (`entityManager.refresh`), so the check always uses the real stock. Every place that changes stock (`LoanService`, `WaitlistService`, `BookService`) takes the lock through this class.
+**Race conditions handled**
 
-**Demo:** with the `race-demo` profile, `POST /api/demo/race/{bookId}?safe=false` runs 10 threads at the last copy without the lock and shows the problem, and `safe=true` runs the real code and shows one success and nine rejections.
+| Situation | Without control | Prevented by |
+|-----------|-----------------|--------------|
+| Many members borrow the last copy | More loans than copies | Lock on the inventory row |
+| One member borrows many books at once | More than 5 loans | Lock on the member row first |
+| Same fine paid twice | Paid twice | Lock on the fine, second gets `FINE_ALREADY_PAID` |
+| Two librarians review the same return | Copy put back twice | Lock on the loan |
+| Walk-in takes a copy held for the waitlist | First in line loses it | Held copies are not counted as available |
+| Hold expires while the member claims it | Copy lost or offered twice | Lock on the entry and the book, status checked again |
 
-### Other races that are handled
+## Testing
 
-| Situation | Problem without control | Prevention |
-|-----------|-------------------------|------------|
-| Same fine paid twice (double click or two devices) | Paid twice | The fine row is locked (`findWithLockById`). The second request sees `PAID` and gets `409 FINE_ALREADY_PAID`. |
-| Member with 4 books borrows 4 more books at once | Ends up with more than 5 loans, because each request counted 4 | The member row is locked first, so the requests run one after another and only one passes the limit (`LOAN_LIMIT_REACHED`). |
-| A walk-in tries to take a copy that was just returned for the waitlist | The first person in line loses their copy | A returned copy that is held is not added to `availableCopies`, so walk-ins get `NO_COPIES_AVAILABLE`. Only the member holding it can claim it. |
-| Two librarians review the same return | The copy goes back on the shelf twice | The loan row is locked, the second review sees `RETURNED` and fails. |
-| Hold expires at the same moment the member claims it or leaves | The copy is offered twice or lost | The waitlist entry is locked together with the book, and the status is re-checked after the lock. |
-| Return and cancel of the same loan at once | Copy counted twice | The loan row is locked, only one of them can change `BORROWED`. |
+Tests run with `mvn test` on an in-memory H2 database (`test` profile). For the concurrent tests, a helper (`ConcurrentRunner`) starts all threads together with a `CountDownLatch` so they hit the code at the same moment, then the test checks the results and the stock rule.
 
-**Lock order:** locks are always taken in the same order, **member first, then book**. If two requests took them in opposite orders they could wait for each other forever (a deadlock).
-
-### Database consistency
-
-The database should never be left wrong just because two requests overlapped. The rule that must always hold for every book:
-
-```
-totalCopies = availableCopies + copies on loan + copies held in the waitlist
-availableCopies >= 0
+```java
+List<Outcome> outcomes = ConcurrentRunner.runTogether(tasks);   // 10 members, 1 copy
+assertEquals(1, ConcurrentRunner.countSucceeded(outcomes));
+assertEquals(9, ConcurrentRunner.countErrorCode(outcomes, "NO_COPIES_AVAILABLE"));
+data.assertStockConsistent(book);
 ```
 
-How it is kept:
-* every borrow, return, review, cancel, claim and hold expiry is one `@Transactional` operation, so either all of it is saved or none of it
-* pessimistic row locks on inventory, member, fine, loan and waitlist entry (see above)
-* notifications and emails are sent only **after the transaction commits** (`TransactionUtils.afterCommit`), so nobody is told about something that was rolled back
-* lock failures are returned as `409 CONCURRENT_UPDATE` instead of a server error
-* the tests check this rule after every concurrent scenario
+* `ConcurrentBorrowTest`: last copy, loan limit, return against cancel.
+* `ConcurrentReturnAndFineTest`: same fine paid 5 times, two librarians reviewing one return.
+* `ConcurrentWaitlistTest`, `HoldExpiryJobTest`: held copies and hold expiry.
+* `ConcurrentRestTest`: real HTTP requests at the same time, one `201` and nine `409`.
+* `BookBorrowTest`, `WaitlistServiceTest`, `ClaimHoldTest`: normal rules with mocks.
 
-### Multithreading used
+## Updated API
 
-| Where | What | Why |
-|-------|------|-----|
-| `notificationExecutor` (`AsyncConfig`) | `ThreadPoolTaskExecutor`, 4 to 8 threads, queue of 100, used with `@Async` in `AsyncEmailService` | The borrow request does not wait for the mail server |
-| `holdExpiryExecutor` (`AsyncConfig`) | Fixed pool of 4 threads, `Callable` tasks, `invokeAll` with a 30 second timeout and `Future` results | `HoldExpiryJob` expires many holds at the same time and counts expired, skipped and failed |
-| `DueReminderJob` | `CompletableFuture` for each email and `CompletableFuture.allOf` to wait for all of them | Sends the daily "due tomorrow" emails together |
-| `@Scheduled` jobs | `HoldExpiryJob` every minute, `DueReminderJob` daily | Background processing |
-| `RaceDemoService` | `ExecutorService` with a `CountDownLatch` start signal | Starts all threads at the same moment for the demo |
+| Method | Endpoint | Description | Access |
+|--------|----------|-------------|--------|
+| POST | `/api/loans` | Borrow a book (now instant) | User |
+| PUT | `/api/loans/{id}/return` | Return a book, waits for review | User |
+| GET | `/api/loans/returns-review` | Returns waiting for review | Librarian |
+| PUT | `/api/loans/{id}/review-return` | Review a return (`damaged`, `notes`, `fineAmount`) | Librarian |
+| PUT | `/api/loans/{id}/cancel` | Cancel a loan that is still out | Librarian |
+| POST | `/api/waitlist` | Join a waitlist | User |
+| GET | `/api/waitlist/my` | My waitlist entries | User |
+| GET | `/api/waitlist/{id}` | One entry with its position | User |
+| DELETE | `/api/waitlist/{id}` | Leave the waitlist | User |
+| POST | `/api/waitlist/{id}/claim?days=` | Claim the held copy | User |
+| GET | `/api/waitlist/book/{bookId}` | Queue of a book | Librarian |
+| GET | `/api/fines/my-fines` | My fines | User |
+| PUT | `/api/fines/{id}/pay` | Pay a fine | User |
+| GET | `/api/fines` | All fines | Librarian |
+| GET | `/api/fines/user/{id}` | A user's fines | Librarian |
+| POST | `/api/demo/race/{bookId}?threads=&safe=` | Last copy race demo | Librarian |
+| POST | `/api/demo/race/loan-limit/{username}?threads=&safe=` | Loan limit race demo | Librarian |
 
-### Logging
+The old approve and reject endpoints were removed. Conflicts return `409` with a code such as `NO_COPIES_AVAILABLE`, `LOAN_LIMIT_REACHED`, `NO_ACTIVE_HOLD`, `HOLD_EXPIRED`, `FINE_ALREADY_PAID` or `CONCURRENT_UPDATE`.
 
-The concurrent and background operations log what ran, the ids involved, how long it took and whether it worked (for example `Borrow started`, `Borrow completed ... in 12 ms`, `Hold expiry finished: 3 expired, 0 skipped, 0 failed`, email start and finish with the thread name). Refused requests and lock conflicts are logged as warnings. Passwords and tokens are never logged.
+## Project 3 Challenges
 
-### Testing
+* The first lock still let a second borrow through, because Hibernate had already loaded an old copy of the stock. I fixed it by re-reading the row after locking (`InventoryLocker`). The race demo had a similar problem and needed `entityManager.clear()`.
+* Deciding what to lock, and in which order, so that requests cannot deadlock.
+* A held copy must not count as available, otherwise walk-ins take it.
+* Races do not fail every time, so the tests needed a latch to start threads together and repeated runs.
 
-Run with `mvn test`. The tests use an in-memory H2 database (`test` profile), so no PostgreSQL is needed, and the seeders are switched off in tests so each test creates its own data.
+## Project 3 Future Improvements
 
-| Test class | What it covers |
-|------------|----------------|
-| `BookBorrowTest` | Borrow, return, review and cancel rules (unit tests with mocks) |
-| `WaitlistServiceTest`, `ClaimHoldTest` | Join, hold, claim, expiry and leave rules, and the lock order |
-| `ConcurrentBorrowTest` | 10 members for the last copy (1 wins, 9 get `NO_COPIES_AVAILABLE`), 3 copies for 10 members, the same member borrowing twice, the 5 book limit, return against cancel |
-| `ConcurrentReturnAndFineTest` | The same fine paid 5 times, two librarians reviewing the same return |
-| `ConcurrentWaitlistTest` | Positions when many join at once, a held copy against walk-ins, claiming and expiring the same hold at once |
-| `HoldExpiryJobTest` | The thread pool expiring several holds together |
-| `ConcurrentRestTest` | Real HTTP requests with JWT at the same time: one `201` and nine `409`, one fine payment `200` and four `409` |
+* Run the tests on PostgreSQL (for example with Testcontainers), because they use H2.
+* Retry automatically on `CONCURRENT_UPDATE` and add a lock timeout.
+* Make sure only one server instance runs the scheduled jobs.
 
-Every concurrent test also checks the stock rule above.
+## Project 3 Credits & External Resources
 
-### Updated planning
+These continue the credits from Project 2 above.
 
-| Day | Work |
-|-----|------|
-| 1 | Waitlist model and workflow |
-| 2 | Holds, claim endpoint, hold expiry |
-| 3 | Race conditions found and fixed with locks, race demo |
-| 4 | Thread pools, async emails, scheduled jobs |
-| 5 | Logging, Swagger updates, cleanup |
-| 6 | Concurrent tests, REST concurrency tests, test fixes |
-| 7 | Documentation, user stories, final testing, presentation |
+* **Claude** - [https://claude.ai](https://claude.ai) - AI help to plan Project 3, explain locking and thread pools, and review the code, As well as writing the final frontend.
+* **Google AI** - General/Quick search about related topics.
 
-### Updated user stories
-
- * [Trello: user stories.](https://trello.com/invite/b/6ac5e7834bebef07fc444288/ATTIdecc791734b4cd6ac191843744f7f8216F35C90A/booknest)
+Thanks to instructor associates: Maryam and Zainab for technical help.
