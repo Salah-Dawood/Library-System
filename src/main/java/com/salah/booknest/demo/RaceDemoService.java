@@ -15,6 +15,7 @@ import com.salah.booknest.repository.InventoryRepository;
 import com.salah.booknest.repository.LoanRepository;
 import com.salah.booknest.repository.UserRepository;
 import com.salah.booknest.service.LoanService;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
@@ -51,6 +52,7 @@ public class RaceDemoService {
     private final LoanRepository loanRepository;
     private final UserRepository userRepository;
     private final BookRepository bookRepository;
+    private final EntityManager entityManager;
 
     /**
      * Sets the book to one copy, then lets many threads try to take it at the same moment.
@@ -89,6 +91,7 @@ public class RaceDemoService {
             pool.shutdown();
         }
 
+        entityManager.clear();
         int availableAfter = readAvailable(bookId);
         setStock(bookId, originalTotal, originalAvailable);
 
