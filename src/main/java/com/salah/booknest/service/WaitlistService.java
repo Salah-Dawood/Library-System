@@ -13,7 +13,6 @@ import com.salah.booknest.model.request.WaitlistRequest;
 import com.salah.booknest.model.response.NotificationEvent;
 import com.salah.booknest.model.response.WaitlistResponse;
 import com.salah.booknest.repository.BookRepository;
-import com.salah.booknest.repository.InventoryRepository;
 import com.salah.booknest.repository.LoanRepository;
 import com.salah.booknest.repository.WaitlistRepository;
 import com.salah.booknest.security.Roles;
@@ -43,7 +42,7 @@ public class WaitlistService {
 
     private final WaitlistRepository waitlistRepository;
     private final BookRepository bookRepository;
-    private final InventoryRepository inventoryRepository;
+    private final InventoryLocker inventoryLocker;
     private final LoanRepository loanRepository;
     private final AuditLogService auditLogService;
     private final AppSharedService appSharedService;
@@ -64,7 +63,7 @@ public class WaitlistService {
         }
 
         // same lock that borrow uses, so a copy can't be returned while we check
-        Inventory inventory = getInventoryForUpdate(book.getId());
+        Inventory inventory = inventoryLocker.lock(book.getId());
         if (inventory.getAvailableCopies() > 0) {
             throw new InvalidStateException("Copies are available, borrow the book instead", "COPIES_AVAILABLE");
         }
@@ -102,7 +101,7 @@ public class WaitlistService {
         auditLogService.log("WAITLIST", "LEFT", entryId);
         if (oldStatus == WaitlistStatus.HOLD_READY) {
             // the copy that was held for this member goes to the next person
-            offerCopy(getInventoryForUpdate(entry.getBook().getId()));
+            offerCopy(inventoryLocker.lock(entry.getBook().getId()));
         }
         log.info("Waitlist entry {} was cancelled by {}", entryId, authentication.getName());
         return WaitlistResponse.from(entry, 0);
@@ -145,7 +144,7 @@ public class WaitlistService {
 
     @Transactional
     public void cancelAllForBook(Long bookId) {
-        Inventory inventory = getInventoryForUpdate(bookId);
+        Inventory inventory = inventoryLocker.lock(bookId);
         List<WaitlistEntry> entries = waitlistRepository.findAllByBookIdAndStatusIn(bookId, ACTIVE_STATUSES);
         for (WaitlistEntry entry : entries) {
             if (entry.getStatus() == WaitlistStatus.HOLD_READY) {
@@ -195,7 +194,7 @@ public class WaitlistService {
         auditLogService.log("WAITLIST", "EXPIRED", entryId);
         log.info("Hold {} expired for user {}", entryId, entry.getUser().getId());
         notifyMember(entry, "HOLD_EXPIRED", "BookNest - Your hold expired", "Your hold on \"" + entry.getBook().getTitle() + "\" expired");
-        offerCopy(getInventoryForUpdate(entry.getBook().getId()));
+        offerCopy(inventoryLocker.lock(entry.getBook().getId()));
         return true;
     }
 
@@ -203,14 +202,9 @@ public class WaitlistService {
     @Transactional
     public WaitlistEntry getEntryLocked(Long entryId) {
         WaitlistEntry entry = findEntry(entryId);
-        getInventoryForUpdate(entry.getBook().getId());
+        inventoryLocker.lock(entry.getBook().getId());
         entityManager.refresh(entry);
         return entry;
-    }
-
-    private Inventory getInventoryForUpdate(Long bookId) {
-        return inventoryRepository.findByBookIdForUpdate(bookId)
-                .orElseThrow(() -> new InformationNotFoundException("Inventory for book " + bookId + " not found"));
     }
 
     private WaitlistEntry findEntry(Long entryId) {

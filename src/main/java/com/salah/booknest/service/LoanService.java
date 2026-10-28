@@ -12,7 +12,6 @@ import com.salah.booknest.model.response.NotificationEvent;
 import com.salah.booknest.model.response.ReturnStats;
 import com.salah.booknest.repository.BookRepository;
 import com.salah.booknest.repository.FineRepository;
-import com.salah.booknest.repository.InventoryRepository;
 import com.salah.booknest.repository.LoanRepository;
 import com.salah.booknest.repository.UserRepository;
 import com.salah.booknest.security.Roles;
@@ -52,7 +51,7 @@ public class LoanService {
     private final LoanRepository loanRepository;
     private final UserRepository userRepository;
     private final BookRepository bookRepository;
-    private final InventoryRepository inventoryRepository;
+    private final InventoryLocker inventoryLocker;
     private final FineRepository fineRepository;
     private final NotificationService notificationService;
     private final AuditLogService auditLogService;
@@ -126,7 +125,7 @@ public class LoanService {
             throw new InvalidStateException("You can have at most " + MAX_ACTIVE_LOANS + " books on loan", "LOAN_LIMIT_REACHED");
         }
 
-        Inventory inventory = getInventoryForUpdate(book.getId());
+        Inventory inventory = inventoryLocker.lock(book.getId());
         if (inventory.getAvailableCopies() < 1) {
             throw new InvalidStateException("No copies of \"" + book.getTitle() + "\" are available", "NO_COPIES_AVAILABLE");
         }
@@ -352,11 +351,6 @@ public class LoanService {
                 .orElseThrow(() -> new InformationNotFoundException("Loan with ID " + loanId + " not found"));
     }
 
-    private Inventory getInventoryForUpdate(Long bookId) {
-        return inventoryRepository.findByBookIdForUpdate(bookId)
-                .orElseThrow(() -> new InformationNotFoundException("Inventory for book " + bookId + " not found"));
-    }
-
     private Loan createLoan(User user, Book book, int days) {
         LocalDate today = LocalDate.now();
         Loan loan = new Loan();
@@ -391,7 +385,7 @@ public class LoanService {
      * A copy came back. It is held for the first member in line, or put back in stock if nobody is waiting.
      */
     private void giveCopyBack(Long bookId) {
-        Inventory inventory = getInventoryForUpdate(bookId);
+        Inventory inventory = inventoryLocker.lock(bookId);
         waitlistService.offerCopy(inventory);
     }
 
@@ -400,7 +394,7 @@ public class LoanService {
      * so only the total goes down.
      */
     private void withdrawCopy(Long bookId) {
-        Inventory inventory = getInventoryForUpdate(bookId);
+        Inventory inventory = inventoryLocker.lock(bookId);
         int total = Math.max(0, inventory.getTotalCopies() - 1);
         inventory.setTotalCopies(total);
         inventory.setAvailableCopies(Math.min(inventory.getAvailableCopies(), total));

@@ -14,7 +14,6 @@ import com.salah.booknest.model.response.BookResponse;
 import com.salah.booknest.repository.AuthorRepository;
 import com.salah.booknest.repository.BookRepository;
 import com.salah.booknest.repository.GenreRepository;
-import com.salah.booknest.repository.InventoryRepository;
 import com.salah.booknest.repository.LoanRepository;
 import com.salah.booknest.repository.ReviewRepository;
 import com.salah.booknest.util.PageUtils;
@@ -34,7 +33,7 @@ public class BookService {
     private final BookRepository bookRepository;
     private final GenreRepository genreRepository;
     private final AuthorRepository authorRepository;
-    private final InventoryRepository inventoryRepository;
+    private final InventoryLocker inventoryLocker;
     private final ReviewRepository reviewRepository;
     private final LoanRepository loanRepository;
     private final AuditLogService auditLogService;
@@ -43,7 +42,7 @@ public class BookService {
     public BookService(BookRepository bookRepository,
                        GenreRepository genreRepository,
                        AuthorRepository authorRepository,
-                       InventoryRepository inventoryRepository,
+                       InventoryLocker inventoryLocker,
                        ReviewRepository reviewRepository,
                        LoanRepository loanRepository,
                        AuditLogService auditLogService,
@@ -51,7 +50,7 @@ public class BookService {
         this.bookRepository = bookRepository;
         this.genreRepository = genreRepository;
         this.authorRepository = authorRepository;
-        this.inventoryRepository = inventoryRepository;
+        this.inventoryLocker = inventoryLocker;
         this.reviewRepository = reviewRepository;
         this.loanRepository = loanRepository;
         this.auditLogService = auditLogService;
@@ -263,8 +262,7 @@ public class BookService {
      * @throws InvalidRequestException if the new total is lower than the number of copies on loan
      */
     private void updateTotalCopies(Long bookId, int newTotal) {
-        Inventory inventory = inventoryRepository.findByBookIdForUpdate(bookId)
-                .orElseThrow(() -> new InformationNotFoundException("Inventory for book " + bookId + " not found"));
+        Inventory inventory = inventoryLocker.lock(bookId);
         int oldTotal = inventory.getTotalCopies();
         int oldAvailable = inventory.getAvailableCopies();
         int onLoan = oldTotal - oldAvailable;
