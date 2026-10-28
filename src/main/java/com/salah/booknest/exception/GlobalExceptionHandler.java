@@ -33,11 +33,15 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(InformationExistException.class)
     public ResponseEntity<ApiError> alreadyExists(InformationExistException ex, HttpServletRequest req) {
+        log.warn("Request refused: {} {} by {} -> RESOURCE_ALREADY_EXISTS: {}",
+                req.getMethod(), req.getRequestURI(), username(req), ex.getMessage());
         return build(HttpStatus.CONFLICT, "RESOURCE_ALREADY_EXISTS", ex.getMessage(), req);
     }
 
     @ExceptionHandler(InvalidStateException.class)
     public ResponseEntity<ApiError> invalidState(InvalidStateException ex, HttpServletRequest req) {
+        log.warn("Request refused: {} {} by {} -> {}: {}",
+                req.getMethod(), req.getRequestURI(), username(req), ex.getCode(), ex.getMessage());
         return build(HttpStatus.CONFLICT, ex.getCode(), ex.getMessage(), req);
     }
 
@@ -114,6 +118,13 @@ public class GlobalExceptionHandler {
         }
         log.error("Unhandled exception on {}", req.getRequestURI(), ex);
         return build(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "An unexpected error occurred", req);
+    }
+
+    private String username(HttpServletRequest req) {
+        if (req.getUserPrincipal() == null) {
+            return "anonymous";
+        }
+        return req.getUserPrincipal().getName();
     }
 
     private ResponseEntity<ApiError> build(HttpStatus status, String error, String message, HttpServletRequest req) {

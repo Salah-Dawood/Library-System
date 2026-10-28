@@ -7,6 +7,7 @@ import com.salah.booknest.model.FineStatus;
 import com.salah.booknest.model.response.FineResponse;
 import com.salah.booknest.repository.FineRepository;
 import com.salah.booknest.repository.LoanRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
@@ -15,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+@Slf4j
 @Service
 public class FineService {
 
@@ -76,6 +78,7 @@ public class FineService {
         }
 
         fine.setStatus(FineStatus.PAID);
+        log.info("Fine {} paid by {}", id, authentication.getName());
         return fineResponser(fine);
     }
 }
