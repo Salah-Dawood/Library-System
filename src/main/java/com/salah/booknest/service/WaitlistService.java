@@ -184,11 +184,12 @@ public class WaitlistService {
     }
 
     // the member did not claim in time: the copy goes to the next person in line
+    // returns false when there was nothing to do
     @Transactional
-    public void expireHold(Long entryId) {
+    public boolean expireHold(Long entryId) {
         WaitlistEntry entry = getEntryLocked(entryId);
         if (entry.getStatus() != WaitlistStatus.HOLD_READY || entry.getHoldExpiresAt().isAfter(LocalDateTime.now())) {
-            return;
+            return false;
         }
 
         entry.setStatus(WaitlistStatus.EXPIRED);
@@ -196,6 +197,7 @@ public class WaitlistService {
         log.info("Hold {} expired for user {}", entryId, entry.getUser().getId());
         notifyMember(entry, "HOLD_EXPIRED", "BookNest - Your hold expired", "Your hold on \"" + entry.getBook().getTitle() + "\" expired");
         offerCopy(getInventoryForUpdate(entry.getBook().getId()));
+        return true;
     }
 
     // lock the book first, then reload the entry, so we always see its latest status
