@@ -16,18 +16,21 @@ import com.salah.booknest.model.request.ReviewReturnRequest;
 import com.salah.booknest.model.response.LoanResponse;
 import com.salah.booknest.repository.BookRepository;
 import com.salah.booknest.repository.FineRepository;
-import com.salah.booknest.repository.InventoryRepository;
 import com.salah.booknest.repository.LoanRepository;
 import com.salah.booknest.repository.UserRepository;
 import com.salah.booknest.service.AppSharedService;
+import com.salah.booknest.service.AsyncEmailService;
 import com.salah.booknest.service.AuditLogService;
+import com.salah.booknest.service.InventoryLocker;
 import com.salah.booknest.service.LoanService;
 import com.salah.booknest.service.NotificationService;
+import com.salah.booknest.service.WaitlistService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -51,6 +54,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -63,11 +68,13 @@ class BookBorrowTest {
     @Mock private LoanRepository loanRepository;
     @Mock private UserRepository userRepository;
     @Mock private BookRepository bookRepository;
-    @Mock private InventoryRepository inventoryRepository;
+    @Mock private InventoryLocker inventoryLocker;
     @Mock private FineRepository fineRepository;
     @Mock private AuditLogService auditLogService;
     @Mock private NotificationService notificationService;
     @Mock private AppSharedService appSharedService;
+    @Mock private WaitlistService waitlistService;
+    @Mock private AsyncEmailService asyncEmailService;
 
     @InjectMocks
     private LoanService loanService;
@@ -107,10 +114,17 @@ class BookBorrowTest {
         librarianAuth = auth("lib", true);
 
         when(appSharedService.getUserFromAuth(memberAuth)).thenReturn(member);
+        when(appSharedService.getUserFromAuthForUpdate(memberAuth)).thenReturn(member);
         when(appSharedService.getUserFromAuth(otherMemberAuth)).thenReturn(otherMember);
         when(appSharedService.getUserFromAuth(librarianAuth)).thenReturn(librarian);
         when(bookRepository.findById(10L)).thenReturn(Optional.of(book));
-        when(inventoryRepository.findByBookIdForUpdate(10L)).thenReturn(Optional.of(inventory));
+        when(inventoryLocker.lock(10L)).thenReturn(inventory);
+        // nobody is waiting, so a returned copy goes back on the shelf
+        doAnswer(call -> {
+            Inventory i = call.getArgument(0);
+            i.setAvailableCopies(Math.min(i.getTotalCopies(), i.getAvailableCopies() + 1));
+            return null;
+        }).when(waitlistService).offerCopy(any(Inventory.class));
         when(loanRepository.save(any(Loan.class))).thenAnswer(inv -> {
             Loan l = inv.getArgument(0);
             l.setId(100L);
@@ -163,16 +177,29 @@ class BookBorrowTest {
     void borrow_fiveActiveLoans_throws() {
         when(loanRepository.countByUserIdAndStatusIn(eq(1L), anyCollection())).thenReturn(5L);
 
-        assertThrows(InvalidStateException.class, () -> loanService.borrow(memberAuth, request(10L, 7)));
+        InvalidStateException e = assertThrows(InvalidStateException.class,
+                () -> loanService.borrow(memberAuth, request(10L, 7)));
+        assertEquals("LOAN_LIMIT_REACHED", e.getCode());
     }
 
     @Test
     void borrow_noCopiesAvailable_throwsAndSavesNothing() {
         inventory.setAvailableCopies(0);
 
-        assertThrows(InvalidStateException.class, () -> loanService.borrow(memberAuth, request(10L, 7)));
+        InvalidStateException e = assertThrows(InvalidStateException.class,
+                () -> loanService.borrow(memberAuth, request(10L, 7)));
+        assertEquals("NO_COPIES_AVAILABLE", e.getCode());
         assertEquals(Integer.valueOf(0), inventory.getAvailableCopies());
         verify(loanRepository, never()).save(any(Loan.class));
+    }
+
+    @Test
+    void borrow_locksTheMemberBeforeTheBook() {
+        loanService.borrow(memberAuth, request(10L, 7));
+
+        InOrder order = inOrder(appSharedService, inventoryLocker);
+        order.verify(appSharedService).getUserFromAuthForUpdate(memberAuth);
+        order.verify(inventoryLocker).lock(10L);
     }
 
     @Test

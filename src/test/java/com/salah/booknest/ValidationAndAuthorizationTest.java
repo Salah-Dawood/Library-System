@@ -24,7 +24,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 /**
@@ -66,9 +65,6 @@ class ValidationAndAuthorizationTest {
     @Test
     void librarianCanCreateAuthor() {
         authenticateAs("ROLE_librarian");
-        when(authorController.createAuthor(any(AuthorRequest.class)))
-                .thenReturn(ResponseEntity.status(HttpStatus.CREATED).build());
-
         ResponseEntity<?> response = authorController.createAuthor(new AuthorRequest());
 
         assertEquals(HttpStatus.CREATED, response.getStatusCode());

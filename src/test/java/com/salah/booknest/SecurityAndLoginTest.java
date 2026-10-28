@@ -1,6 +1,7 @@
 package com.salah.booknest;
 
 import com.salah.booknest.controller.UserController;
+import com.salah.booknest.exception.UserNotVerifiedException;
 import com.salah.booknest.model.User;
 import com.salah.booknest.model.request.LoginRequest;
 import com.salah.booknest.security.JWTUtils;
@@ -51,6 +52,7 @@ class SecurityAndLoginTest {
         auditLogService = mock(AuditLogService.class);
         userService = new UserService(userRepository, passwordEncoder, jwtUtils,
                 authenticationManager, auditLogService);
+        userController = new UserController(userService);
     }
 
     @Test
@@ -70,15 +72,14 @@ class SecurityAndLoginTest {
     }
 
     @Test
-    void loginUnverifiedUserReturnsForbiddenWithoutGeneratingToken() {
+    void loginUnverifiedUserThrowsAndDoesNotGenerateToken() {
         User user = user(1L, "alice", false);
         MyUserDetails details = new MyUserDetails(user);
         when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
                 .thenReturn(new UsernamePasswordAuthenticationToken(details, "password", details.getAuthorities()));
 
-        var response = userController.loginUser(loginRequest("alice", "password"));
-
-        assertEquals(403, response.getStatusCode().value());
+        assertThrows(UserNotVerifiedException.class,
+                () -> userController.loginUser(loginRequest("alice", "password")));
     }
 
     @Test

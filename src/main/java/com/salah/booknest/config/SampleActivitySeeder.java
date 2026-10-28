@@ -31,6 +31,7 @@ import java.time.LocalDate;
  * Dates are relative to today, so "overdue" or "early" are always true when the app is started.
  */
 @Component
+@Profile("!test")
 @Order(2) // runs after DatabaseSeeder (@Order(1)) has created the users and books
 @RequiredArgsConstructor
 public class SampleActivitySeeder implements CommandLineRunner {
