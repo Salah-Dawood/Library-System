@@ -17,6 +17,7 @@ import com.salah.booknest.repository.LoanRepository;
 import com.salah.booknest.repository.UserRepository;
 import com.salah.booknest.security.Roles;
 import com.salah.booknest.util.PageUtils;
+import com.salah.booknest.util.TransactionUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
@@ -25,8 +26,6 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -411,7 +410,7 @@ public class LoanService {
         String username = loan.getUser().getUsername();
         String email = loan.getUser().getEmailAddress();
         NotificationEvent event = newEvent(loan, type, message);
-        afterCommit(() -> {
+        TransactionUtils.afterCommit(() -> {
             notificationService.notifyUser(username, event);
             asyncEmailService.sendNotificationEmail(username, email, emailSubject(type), message);
         });
@@ -428,23 +427,11 @@ public class LoanService {
 
     private void notifyLibrarians(Loan loan, String type, String message) {
         NotificationEvent event = newEvent(loan, type, message);
-        afterCommit(() -> notificationService.notifyLibrarians(event));
+        TransactionUtils.afterCommit(() -> notificationService.notifyLibrarians(event));
     }
 
     private NotificationEvent newEvent(Loan loan, String type, String message) {
         return new NotificationEvent(type, message, loan.getId(), loan.getStatus(), LocalDateTime.now());
-    }
-
-    /**
-     * Runs the action only after the transaction commits, so users are never notified about a change that was rolled back.
-     */
-    private void afterCommit(Runnable action) {
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                action.run();
-            }
-        });
     }
 
     @Value("${app.fines.late-per-day}") private BigDecimal latePerDay;

@@ -8,6 +8,7 @@ import com.salah.booknest.repository.AuditLogRepository;
 import com.salah.booknest.repository.UserRepository;
 import com.salah.booknest.service.auditchannels.AuditChannel;
 import com.salah.booknest.util.PageUtils;
+import com.salah.booknest.util.TransactionUtils;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,8 +19,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -30,7 +29,7 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class AuditLogService {
 
-    //for system actions
+    // used when nobody is logged in, for example the job that expires holds
     private static final Long SYSTEM_USER_ID = 0L;
 
     private static final Logger AUDIT = LoggerFactory.getLogger("AUDIT LOG");
@@ -72,7 +71,7 @@ public class AuditLogService {
 
         matchingChannel.processAndSave(info);
         String readableLog = describeActor(info.userId()) + " " + matchingChannel.getReadableLog(info);
-        afterCommit(() -> AUDIT.info(readableLog));
+        TransactionUtils.afterCommit(() -> AUDIT.info(readableLog));
     }
 
     /**
@@ -106,19 +105,4 @@ public class AuditLogService {
                 .orElse("user #" + userId);
     }
 
-    /**
-     * Defers the action until the transaction commits; runs it immediately when there is no active transaction.
-     */
-    private void afterCommit(Runnable action) {
-        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            action.run();
-            return;
-        }
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                action.run();
-            }
-        });
-    }
 }

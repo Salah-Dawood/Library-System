@@ -17,6 +17,7 @@ import com.salah.booknest.repository.InventoryRepository;
 import com.salah.booknest.repository.LoanRepository;
 import com.salah.booknest.repository.WaitlistRepository;
 import com.salah.booknest.security.Roles;
+import com.salah.booknest.util.TransactionUtils;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,8 +26,6 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -184,7 +183,7 @@ public class WaitlistService {
     }
 
     // the member did not claim in time: the copy goes to the next person in line
-    // returns false when there was nothing to do
+    // returns false when there was nothing to do, for example the member claimed it just before
     @Transactional
     public boolean expireHold(Long entryId) {
         WaitlistEntry entry = getEntryLocked(entryId);
@@ -230,18 +229,9 @@ public class WaitlistService {
         String username = entry.getUser().getUsername();
         String email = entry.getUser().getEmailAddress();
         NotificationEvent event = new NotificationEvent(type, message, null, null, LocalDateTime.now());
-        afterCommit(() -> {
+        TransactionUtils.afterCommit(() -> {
             notificationService.notifyUser(username, event);
             asyncEmailService.sendNotificationEmail(username, email, subject, message);
-        });
-    }
-
-    private void afterCommit(Runnable action) {
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                action.run();
-            }
         });
     }
 
