@@ -39,7 +39,7 @@ public class DatabaseSeeder implements CommandLineRunner {
             seedLibrarian("librarian","Salah","Dawood","salah.dawood364@gmail.com");
 
             // 2.members
-            seedMember("johnd", "John", "Doe", "john.doe@gmail.com");
+            seedMember("johnd", "John", "Doe", "202200240@student.polytechnic.bh");
             seedMember("janed", "Jane", "Smith", "jane.smith@yahoo.com");
             seedMember("alexm", "Alex", "Miller", "alex.miller@outlook.com");
 

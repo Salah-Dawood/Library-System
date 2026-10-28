@@ -51,7 +51,7 @@ public class WaitlistService {
     private final AsyncEmailService asyncEmailService;
     private final EntityManager entityManager;
 
-    @Value("${app.holds.hours:24}")
+    @Value("${app.holds.hours}")
     private int holdHours;
 
     @Transactional
