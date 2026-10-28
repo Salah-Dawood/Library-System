@@ -19,6 +19,7 @@ import com.salah.booknest.security.Roles;
 import com.salah.booknest.util.PageUtils;
 import com.salah.booknest.util.TransactionUtils;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -34,6 +35,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class LoanService {
@@ -108,7 +110,9 @@ public class LoanService {
             throw new InvalidRequestException("Loan duration must be between 1 and " + MAX_LOAN_DAYS + " days");
         }
 
+        long started = System.currentTimeMillis();
         User user = appSharedService.getUserFromAuthForUpdate(authentication);
+        log.info("Borrow started: user={} book={} days={}", user.getId(), request.getBookId(), days);
         Book book = bookRepository.findById(request.getBookId()).orElseThrow(
                 () -> new InformationNotFoundException("Book with ID " + request.getBookId() + " not found"));
         if (!Boolean.TRUE.equals(book.getActive())) {
@@ -129,6 +133,8 @@ public class LoanService {
         inventory.setAvailableCopies(inventory.getAvailableCopies() - 1);
 
         Loan loan = createLoan(user, book, days);
+        log.info("Borrow completed: loan={} user={} book={} copiesLeft={} in {} ms",
+                loan.getId(), user.getId(), book.getId(), inventory.getAvailableCopies(), System.currentTimeMillis() - started);
         return LoanResponse.from(loan);
     }
 
@@ -147,6 +153,7 @@ public class LoanService {
 
         loan.setStatus(LoanStatus.CANCELLED);
         auditLogService.log("LOAN", "CANCELLED", loanId);
+        log.info("Loan {} cancelled, book {}", loanId, loan.getBook().getId());
         notifyMember(loan, "LOAN_CANCELLED",
                 "Your loan of \"" + loan.getBook().getTitle() + "\" was cancelled by a librarian");
         return LoanResponse.from(loan);
@@ -182,6 +189,7 @@ public class LoanService {
 
         String timing = describeTiming(ReturnTiming.daysLate(loan.getDueDate(), loan.getReturnDate()));
         auditLogService.log("LOAN", "RETURNED", loanId);
+        log.info("Return registered: loan={} book={} by={} {}", loanId, loan.getBook().getId(), authentication.getName(), timing);
 
         String title = loan.getBook().getTitle();
         if (owner) {
@@ -240,6 +248,7 @@ public class LoanService {
             fine.setAmount(fineAmount);
             fine.setReason(fineReason(request.damaged(), late, daysLate, notes));
             fineRepository.save(fine);
+            log.info("Fine {} added to loan {} during review: {}", fine.getId(), loanId, fineAmount);
         }
 
         loan.setStatus(LoanStatus.RETURNED);
@@ -249,6 +258,8 @@ public class LoanService {
         loan.setReviewedAt(LocalDateTime.now());
 
         auditLogService.log("LOAN", request.damaged() ? "RETURN_DAMAGED" : "RETURN_CLEARED", loanId);
+        log.info("Return reviewed: loan={} book={} by={} damaged={} fined={}",
+                loanId, loan.getBook().getId(), librarian.getName(), request.damaged(), fined);
 
         String title = loan.getBook().getTitle();
         String message = request.damaged()
@@ -295,6 +306,7 @@ public class LoanService {
         entry.setStatus(WaitlistStatus.FULFILLED);
         Loan loan = createLoan(user, entry.getBook(), days);
         auditLogService.log("WAITLIST", "CLAIMED", entryId);
+        log.info("Hold claimed: entry={} user={} book={} loan={}", entryId, user.getId(), entry.getBook().getId(), loan.getId());
         return LoanResponse.from(loan);
     }
 
@@ -449,5 +461,6 @@ public class LoanService {
         fine.setReason(reason);
         fineRepository.save(fine);
         auditLogService.log("FINE", "ASSESSED", fine.getId());
+        log.info("Fine {} created for loan {}: {} {}", fine.getId(), loan.getId(), type, amount);
     }
 }

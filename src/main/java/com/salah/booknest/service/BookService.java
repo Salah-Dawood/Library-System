@@ -19,6 +19,7 @@ import com.salah.booknest.repository.LoanRepository;
 import com.salah.booknest.repository.ReviewRepository;
 import com.salah.booknest.util.PageUtils;
 import jakarta.persistence.criteria.Join;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -27,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
 
+@Slf4j
 @Service
 public class BookService {
     private final BookRepository bookRepository;
@@ -249,6 +251,7 @@ public class BookService {
         book.setActive(false);
         waitlistService.cancelAllForBook(bookId);
         auditLogService.log("BOOK", "DEACTIVATED", bookId);
+        log.info("Book {} deactivated", bookId);
     }
 
 
@@ -278,6 +281,8 @@ public class BookService {
         } else {
             inventory.setAvailableCopies(newTotal - onLoan);
         }
+        log.info("Stock of book {} changed: total {} -> {}, available {} -> {}",
+                bookId, oldTotal, newTotal, oldAvailable, inventory.getAvailableCopies());
     }
 
     //helper methods
