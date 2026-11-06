@@ -23,13 +23,11 @@ public class FineService {
     private final FineRepository fineRepository;
     private final LoanRepository loanRepository;
     private final AppSharedService appSharedService;
-    private final LoanService loanService;
 
-    public FineService(FineRepository fineRepository, LoanRepository loanRepository, AppSharedService appSharedService, LoanService loanService) {
+    public FineService(FineRepository fineRepository, LoanRepository loanRepository, AppSharedService appSharedService) {
         this.fineRepository = fineRepository;
         this.loanRepository = loanRepository;
         this.appSharedService = appSharedService;
-        this.loanService = loanService;
     }
 
     public FineResponse fineResponser(Fine fine){
