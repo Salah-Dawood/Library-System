@@ -18,6 +18,7 @@ import com.salah.booknest.repository.UserRepository;
 import com.salah.booknest.repository.WaitlistRepository;
 import com.salah.booknest.service.AuditLogService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Profile;
@@ -38,6 +39,7 @@ import java.time.LocalDateTime;
 @Component
 @Profile("!test")
 @Order(2) // runs after DatabaseSeeder (@Order(1)) has created the users and books
+@Slf4j
 @RequiredArgsConstructor
 public class SampleActivitySeeder implements CommandLineRunner {
 
@@ -56,15 +58,15 @@ public class SampleActivitySeeder implements CommandLineRunner {
     @Override
     public void run(String... args) {
         if (loanRepository.count() > 0 || reviewRepository.count() > 0) {
-            System.out.println("Loans or reviews already exist. Skipping sample loans and reviews.");
+            log.info("Loans or reviews already exist. Skipping sample activity.");
             return;
         }
         try {
             // One transaction for everything: if a sample user or book is missing, nothing is saved
             new TransactionTemplate(transactionManager).executeWithoutResult(status -> seedSampleActivity());
-            System.out.println("Sample loans and reviews successfully seeded!");
+            log.info("Sample loans, reviews and waitlist entries successfully seeded!");
         } catch (InformationNotFoundException e) {
-            System.out.println("Skipping sample loans and reviews: " + e.getMessage());
+            log.warn("Skipping sample activity: {}", e.getMessage());
         }
     }
 

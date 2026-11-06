@@ -8,6 +8,7 @@ import com.salah.booknest.repository.GenreRepository;
 import com.salah.booknest.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
@@ -22,6 +23,7 @@ import java.util.concurrent.ThreadLocalRandom;
 @Component
 @Profile("!test")
 @Order(1)
+@Slf4j
 @RequiredArgsConstructor
 public class DatabaseSeeder implements CommandLineRunner {
 
@@ -97,9 +99,9 @@ public class DatabaseSeeder implements CommandLineRunner {
             seedBook("Dune", "9780441172719", 1965, "Frank Herbert", List.of(1L, 2L, 4L, 5L)); // Dystopian, Fantasy, War, Sci-Fi
             seedBook("Dune Messiah", "9780441172696", 1969, "Frank Herbert", List.of(1L, 4L, 5L)); // Dystopian, War, Sci-Fi
 
-            System.out.println("Database successfully seeded!");
+            log.info("Database successfully seeded!");
         } else {
-            System.out.println("Database already has data. Skipping seeding.");
+            log.info("Database already has data. Skipping seeding.");
         }
     }
 
