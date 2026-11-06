@@ -8,13 +8,17 @@ import com.salah.booknest.model.Loan;
 import com.salah.booknest.model.LoanStatus;
 import com.salah.booknest.model.Review;
 import com.salah.booknest.model.User;
+import com.salah.booknest.model.WaitlistEntry;
+import com.salah.booknest.model.WaitlistStatus;
 import com.salah.booknest.repository.BookRepository;
 import com.salah.booknest.repository.FineRepository;
 import com.salah.booknest.repository.LoanRepository;
 import com.salah.booknest.repository.ReviewRepository;
 import com.salah.booknest.repository.UserRepository;
+import com.salah.booknest.repository.WaitlistRepository;
 import com.salah.booknest.service.AuditLogService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
@@ -24,9 +28,10 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 /**
- * Adds sample loans and reviews (and their audit entries) for the users and books created by DatabaseSeeder,
+ * Adds sample loans, reviews and waitlist entries (and their audit entries) for the users and books created by DatabaseSeeder,
  * so the whole workflow can be shown straight after startup.
  * Dates are relative to today, so "overdue" or "early" are always true when the app is started.
  */
@@ -43,6 +48,10 @@ public class SampleActivitySeeder implements CommandLineRunner {
     private final FineRepository fineRepository;
     private final AuditLogService auditLogService;
     private final PlatformTransactionManager transactionManager;
+    private final WaitlistRepository waitlistRepository;
+
+    @Value("${app.holds.hours}")
+    private int holdHours;
 
     @Override
     public void run(String... args) {
@@ -79,6 +88,8 @@ public class SampleActivitySeeder implements CommandLineRunner {
         Book noneLeft = findBook("And Then There Were None");
         Book dune = findBook("Dune");
         Book duneMessiah = findBook("Dune Messiah");
+        Book twoTowers = findBook("The Two Towers");
+        Book orderOfPhoenix = findBook("Harry Potter and the Order of the Phoenix");
 
 
         // johnd: a reliable member. Every return was on time or early, which earns the "Reliable member" badge.
@@ -111,6 +122,44 @@ public class SampleActivitySeeder implements CommandLineRunner {
         review(alex, hobbit, 9, "The perfect way into Middle-earth.");
         review(jane, animalFarm, 7, "Short, sharp and surprisingly funny in places.");
         review(jane, mockingbird, 10, "A moving story with unforgettable characters.");
+
+        // Waitlist: "The Two Towers" has one copy and johnd has it, so janed and alexm are waiting in line
+        setStock(twoTowers, 1);
+        borrowed(john, twoTowers, 14, 4);
+        waiting(jane, twoTowers);
+        waiting(alex, twoTowers);
+
+        // Active hold: johnd returned the only copy of "Order of the Phoenix" yesterday, it is now held
+        // for alexm (first in line) and janed waits second
+        setStock(orderOfPhoenix, 1);
+        returnedAndCleared(librarian, john, orderOfPhoenix, 7, 8, 0);
+        holdReady(alex, orderOfPhoenix);
+        waiting(jane, orderOfPhoenix);
+    }
+
+    // ---- waitlist ----
+
+    private void waiting(User member, Book book) {
+        WaitlistEntry entry = new WaitlistEntry();
+        entry.setUser(member);
+        entry.setBook(book);
+        entry = waitlistRepository.save(entry);
+
+        audit("WAITLIST", member, "JOINED", entry.getId());
+    }
+
+    /** First in line when a copy came back. The copy is held for the member, so it is not available. */
+    private void holdReady(User member, Book book) {
+        WaitlistEntry entry = new WaitlistEntry();
+        entry.setUser(member);
+        entry.setBook(book);
+        entry.setStatus(WaitlistStatus.HOLD_READY);
+        entry.setHoldExpiresAt(LocalDateTime.now().plusHours(holdHours));
+        entry = waitlistRepository.save(entry);
+        takeCopy(book);
+
+        audit("WAITLIST", member, "JOINED", entry.getId());
+        audit("WAITLIST", member, "HOLD_STARTED", entry.getId());
     }
 
     // ---- loan states ----
@@ -216,6 +265,11 @@ public class SampleActivitySeeder implements CommandLineRunner {
         int total = Math.max(0, inventory.getTotalCopies() - 1);
         inventory.setTotalCopies(total);
         inventory.setAvailableCopies(Math.min(inventory.getAvailableCopies(), total));
+    }
+
+    private void setStock(Book book, int copies) {
+        book.getInventory().setTotalCopies(copies);
+        book.getInventory().setAvailableCopies(copies);
     }
 
     private void takeCopy(Book book) {
