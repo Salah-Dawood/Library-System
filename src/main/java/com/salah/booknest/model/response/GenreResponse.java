@@ -15,8 +15,8 @@ public class GenreResponse {
     private Long id;
     private String name;
     private String description;
-    private String createdAt;
-    private String updatedAt;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 
     public static GenreResponse from(Genre genre) {
         return new GenreResponse(

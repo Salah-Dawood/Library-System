@@ -5,6 +5,7 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -30,11 +31,11 @@ public class Genre {
 
     @CreationTimestamp
     @Column
-    private String createdAt;
+    private LocalDateTime createdAt;
 
     @UpdateTimestamp
     @Column
-    private String updatedAt;
+    private LocalDateTime updatedAt;
 
     @Column
     @ManyToMany(mappedBy = "genres")
