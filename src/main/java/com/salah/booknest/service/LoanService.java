@@ -13,7 +13,6 @@ import com.salah.booknest.model.response.ReturnStats;
 import com.salah.booknest.repository.BookRepository;
 import com.salah.booknest.repository.FineRepository;
 import com.salah.booknest.repository.LoanRepository;
-import com.salah.booknest.repository.UserRepository;
 import com.salah.booknest.security.Roles;
 import com.salah.booknest.util.PageUtils;
 import com.salah.booknest.util.TransactionUtils;
@@ -49,7 +48,6 @@ public class LoanService {
             Set.of("id", "createdAt", "loanDate", "dueDate", "returnDate", "status");
 
     private final LoanRepository loanRepository;
-    private final UserRepository userRepository;
     private final BookRepository bookRepository;
     private final InventoryLocker inventoryLocker;
     private final FineRepository fineRepository;
