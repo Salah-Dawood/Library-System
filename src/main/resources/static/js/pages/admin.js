@@ -117,14 +117,16 @@ export async function waitlistPage(ctx) {
 /* ---------- all fines ---------- */
 
 export async function finesPage(ctx) {
+  const state = { page: 0 };
   const holder = h("div");
   async function load() {
     replace(holder, spinner());
     try {
-      const rows = await API.allFines();
+      const page = await API.allFines({ page: state.page, size: 12 });
+      const rows = page.content;
       const owed = rows.filter((f) => f.status === "PENDING").reduce((sum, f) => sum + Number(f.amount), 0);
       replace(holder,
-        h("div", { class: "stats" }, stat("Unpaid", fmtMoney(owed)), stat("Fines in total", rows.length)),
+        h("div", { class: "stats" }, stat("Unpaid on this page", fmtMoney(owed)), stat("Fines in total", page.totalElements)),
         h("div", { class: "panel" }, table([
           { label: "Fine", class: "num", render: (f) => "#" + f.id },
           { label: "Loan", class: "num", render: (f) => "#" + f.loanId },
@@ -133,7 +135,7 @@ export async function finesPage(ctx) {
           { label: "Amount", class: "num", render: (f) => fmtMoney(f.amount) },
           { label: "Status", render: (f) => statusBadge(f.status) },
           { label: "", class: "actions", render: (f) => f.status === "PENDING" ? h("button", { class: "btn secondary sm", type: "button", onclick: () => pay(f) }, "Mark as paid") : null },
-        ], rows, empty("No fines yet"))));
+        ], rows, empty("No fines yet")), pager(page, (p) => { state.page = p; load(); })));
     } catch (error) { replace(holder, empty("Could not load fines", error.message)); }
   }
   async function pay(fine) {
@@ -195,7 +197,7 @@ async function memberDrawer(userId) {
   try {
     const [user, stats, loans, fines] = await Promise.all([
       API.user(userId), API.userStats(userId).catch(() => null),
-      API.userLoans(userId, { size: 5 }).catch(() => null), API.userFines(userId).catch(() => []),
+      API.userLoans(userId, { size: 5 }).catch(() => null), API.userFines(userId, { size: 5 }).catch(() => null),
     ]);
     const p = user.profile || {};
     box.panel.querySelector("h2").textContent = [p.firstName, p.lastName].filter(Boolean).join(" ") || user.username;
@@ -211,10 +213,10 @@ async function memberDrawer(userId) {
         loans && loans.content.length ? table([
           { label: "Book", render: (l) => l.bookTitle }, { label: "Due", render: (l) => fmtDate(l.dueDate) }, { label: "Status", render: (l) => statusBadge(l.status) },
         ], loans.content) : h("p", { class: "muted" }, "No loans yet.")),
-      h("div", null, h("h3", { style: "margin-bottom:8px" }, "Fines"),
-        fines.length ? table([
+      h("div", null, h("h3", { style: "margin-bottom:8px" }, "Recent fines"),
+        fines && fines.content.length ? table([
           { label: "Reason", render: (f) => f.reason }, { label: "Amount", class: "num", render: (f) => fmtMoney(f.amount) }, { label: "Status", render: (f) => statusBadge(f.status) },
-        ], fines) : h("p", { class: "muted" }, "No fines."))));
+        ], fines.content) : h("p", { class: "muted" }, "No fines."))));
   } catch (error) { replace(body, empty("Could not load this member", error.message)); }
 }
 

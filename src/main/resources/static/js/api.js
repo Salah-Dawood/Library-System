@@ -140,9 +140,9 @@ export const API = {
   bookQueue: (bookId) => get("/api/waitlist/book/" + bookId),
 
   // fines
-  myFines: () => get("/api/fines/my-fines"),
-  allFines: () => get("/api/fines"),
-  userFines: (userId) => get("/api/fines/user/" + userId),
+  myFines: (query) => get("/api/fines/my-fines", query),
+  allFines: (query) => get("/api/fines", query),
+  userFines: (userId, query) => get("/api/fines/user/" + userId, query),
   payFine: (id) => put("/api/fines/" + id + "/pay"),
 
   // profile

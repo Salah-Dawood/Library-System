@@ -103,21 +103,23 @@ export async function waitlistPage(ctx) {
 /* ---------- my fines ---------- */
 
 export async function finesPage(ctx) {
+  const state = { page: 0 };
   const holder = h("div");
   async function load() {
     replace(holder, spinner());
     try {
-      const rows = await API.myFines();
+      const page = await API.myFines({ page: state.page, size: 10 });
+      const rows = page.content;
       const owed = rows.filter((f) => f.status === "PENDING").reduce((sum, f) => sum + Number(f.amount), 0);
       replace(holder,
-        h("div", { class: "stats" }, stat("Unpaid", fmtMoney(owed)), stat("Fines in total", rows.length)),
+        h("div", { class: "stats" }, stat("Unpaid on this page", fmtMoney(owed)), stat("Fines in total", page.totalElements)),
         h("div", { class: "panel" }, table([
           { label: "Reason", render: (f) => f.reason },
           { label: "Type", render: (f) => statusBadge(f.type) },
           { label: "Amount", class: "num", render: (f) => fmtMoney(f.amount) },
           { label: "Status", render: (f) => statusBadge(f.status) },
           { label: "", class: "actions", render: (f) => f.status === "PENDING" ? h("button", { class: "btn sm", type: "button", onclick: (e) => pay(e, f) }, "Pay fine") : null },
-        ], rows, empty("You have no fines", "Late returns and damaged copies show up here."))));
+        ], rows, empty("You have no fines", "Late returns and damaged copies show up here.")), pager(page, (p) => { state.page = p; load(); })));
     } catch (error) { replace(holder, empty("Could not load your fines", error.message)); }
   }
   async function pay(event, fine) {
