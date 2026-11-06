@@ -6,27 +6,28 @@ import com.salah.booknest.model.Fine;
 import com.salah.booknest.model.FineStatus;
 import com.salah.booknest.model.response.FineResponse;
 import com.salah.booknest.repository.FineRepository;
-import com.salah.booknest.repository.LoanRepository;
+import com.salah.booknest.util.PageUtils;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
+import java.util.Set;
 
 @Slf4j
 @Service
 public class FineService {
 
+    private static final Set<String> SORTABLE_FIELDS = Set.of("id", "createdAt", "amount", "status", "type");
+
     private final FineRepository fineRepository;
-    private final LoanRepository loanRepository;
     private final AppSharedService appSharedService;
 
-    public FineService(FineRepository fineRepository, LoanRepository loanRepository, AppSharedService appSharedService) {
+    public FineService(FineRepository fineRepository, AppSharedService appSharedService) {
         this.fineRepository = fineRepository;
-        this.loanRepository = loanRepository;
         this.appSharedService = appSharedService;
     }
 
@@ -44,24 +45,18 @@ public class FineService {
 
 
 
-    public List<FineResponse> getAllFines(){
-        return fineRepository.findAll().stream()
-                .map(this::fineResponser)
-                .toList();
+    public Page<FineResponse> getAllFines(int page, int size, String sortBy, String sortDir){
+        Pageable pageable = PageUtils.pageable(page, size, sortBy, sortDir, SORTABLE_FIELDS);
+        return fineRepository.findAll(pageable).map(this::fineResponser);
     }
 
-    public List<FineResponse> getMyFines(Authentication authentication){
-        return loanRepository.findAllByUserId(appSharedService.getUserFromAuth(authentication).getId(), Sort.unsorted())
-                .stream().flatMap(loan -> loan.getFines().stream())
-                .map(this::fineResponser)
-                .toList();
+    public Page<FineResponse> getMyFines(Authentication authentication, int page, int size, String sortBy, String sortDir){
+        return getUserFines(appSharedService.getUserFromAuth(authentication).getId(), page, size, sortBy, sortDir);
     }
 
-    public List<FineResponse> getUserFines(Long id){
-        return loanRepository.findAllByUserId(id, Sort.unsorted())
-                .stream().flatMap(loan -> loan.getFines().stream())
-                .map(this::fineResponser)
-                .toList();
+    public Page<FineResponse> getUserFines(Long id, int page, int size, String sortBy, String sortDir){
+        Pageable pageable = PageUtils.pageable(page, size, sortBy, sortDir, SORTABLE_FIELDS);
+        return fineRepository.findAllByLoanUserId(id, pageable).map(this::fineResponser);
     }
 
     @Transactional
