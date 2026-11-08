@@ -29,7 +29,7 @@ public class LoanChannel implements AuditChannel {
     @Override
     public String getReadableLog(AuditTriggerInfo info) {
         String target = loanRepository.findById(info.whatId())
-                .map(l -> "loan #" + l.getId() + " of '" + l.getBook().getTitle() + "' for " + l.getUser().getUsername())
+                .map(l -> "loan #" + l.getId() + " of '" + l.getBookTitle() + "' for " + l.getUsername())
                 .orElse("loan #" + info.whatId());
         return info.action().toLowerCase() + " " + target;
     }

@@ -24,11 +24,9 @@ public class FineService {
     private static final Set<String> SORTABLE_FIELDS = Set.of("id", "createdAt", "amount", "status", "type");
 
     private final FineRepository fineRepository;
-    private final AppSharedService appSharedService;
 
-    public FineService(FineRepository fineRepository, AppSharedService appSharedService) {
+    public FineService(FineRepository fineRepository) {
         this.fineRepository = fineRepository;
-        this.appSharedService = appSharedService;
     }
 
     public FineResponse fineResponser(Fine fine){
@@ -51,7 +49,7 @@ public class FineService {
     }
 
     public Page<FineResponse> getMyFines(Authentication authentication, int page, int size, String sortBy, String sortDir){
-        return getUserFines(appSharedService.getUserFromAuth(authentication).getId(), page, size, sortBy, sortDir);
+        return getUserFines(MemberService.tokenUser(authentication).id(), page, size, sortBy, sortDir);
     }
 
     public Page<FineResponse> getUserFines(Long id, int page, int size, String sortBy, String sortDir){
@@ -63,7 +61,7 @@ public class FineService {
     public FineResponse payFine(Long id, Authentication authentication){
         // the fine row is locked, so two payments of the same fine cannot both go through
         Fine fine = fineRepository.findWithLockById(id).orElseThrow(() -> new InformationNotFoundException("Fine with ID " + id + " not found!"));
-        if (!fine.getLoan().getUser().getUsername().equals(authentication.getName())) {
+        if (!fine.getLoan().getUsername().equals(authentication.getName())) {
             throw new AccessDeniedException("You can only pay your own fines");
         }
         if (fine.getStatus() == FineStatus.PAID) {

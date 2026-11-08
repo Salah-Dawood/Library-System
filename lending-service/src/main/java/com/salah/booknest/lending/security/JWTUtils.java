@@ -1,58 +1,32 @@
 package com.salah.booknest.lending.security;
 
 import io.jsonwebtoken.Claims;
-
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.util.Date;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
+/**
+ * Reads the tokens issued by user-service. This service never creates tokens.
+ */
+@Slf4j
 @Service
 public class JWTUtils {
 
-    Logger logger = Logger.getLogger(JWTUtils.class.getName());
+    private static final String PURPOSE_CLAIM = "purpose";
 
     @Value("${jwt-secret}")
     private String jwtSecret;
 
-    @Value("${jwt-expiration-ms}")
-    private int jwtExpirationMs;
-
-
-    public String generateJwtToken(MyUserDetails myUserDetails){
-        return Jwts.builder()
-                .setSubject(myUserDetails.getUsername())
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(new Date().getTime() + jwtExpirationMs))
-                .signWith(SignatureAlgorithm.HS256,jwtSecret)
-                .compact();
-    }
-
-    public String getUserNameFromJwtToken(String token){
-        return Jwts.parserBuilder().setSigningKey(jwtSecret).build().parseClaimsJws(token).getBody().getSubject();
-    }
-
-    public boolean validateJwtToken(String authToken) {
+    /** The claims of a valid login token, or null if the token is invalid, expired or a password-reset token. */
+    public Claims getLoginClaims(String token) {
         try {
-            Jwts.parserBuilder().setSigningKey(jwtSecret).build().parseClaimsJws(authToken);
-            return true;
+            Claims claims = Jwts.parserBuilder().setSigningKey(jwtSecret).build().parseClaimsJws(token).getBody();
+            return claims.get(PURPOSE_CLAIM) == null ? claims : null;
         } catch (JwtException | IllegalArgumentException e) {
-            logger.log(Level.SEVERE, "JWT validation failed: {0}", e.getMessage());
+            log.warn("JWT validation failed: {}", e.getMessage());
+            return null;
         }
-        return false;
-    }
-
-    private static final String PURPOSE_CLAIM = "purpose";
-    private static final String RESET_PURPOSE = "password-reset";
-
-    //verify if passwordtoken valid
-    public boolean isPasswordResetToken(String token) {
-        Claims claims = Jwts.parserBuilder().setSigningKey(jwtSecret).build().parseClaimsJws(token).getBody();
-        return RESET_PURPOSE.equals(claims.get(PURPOSE_CLAIM));
     }
 }

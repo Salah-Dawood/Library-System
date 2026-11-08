@@ -1,11 +1,11 @@
 package com.salah.booknest.lending.service;
 
 import com.salah.booknest.lending.exception.InvalidRequestException;
-import com.salah.booknest.lending.model.User;
 import com.salah.booknest.lending.model.request.AuditTriggerInfo;
 import com.salah.booknest.lending.model.response.AuditLogResponse;
 import com.salah.booknest.lending.repository.AuditLogRepository;
-import com.salah.booknest.lending.repository.UserRepository;
+import com.salah.booknest.lending.repository.MemberRepository;
+import com.salah.booknest.lending.security.TokenUser;
 import com.salah.booknest.lending.service.auditchannels.AuditChannel;
 import com.salah.booknest.lending.util.PageUtils;
 import com.salah.booknest.lending.util.TransactionUtils;
@@ -37,7 +37,7 @@ public class AuditLogService {
 
     private final List<AuditChannel> channels;
     private final AuditLogRepository auditLogRepository;
-    private final UserRepository userRepository;
+    private final MemberRepository memberRepository;
 
     /**
      * Records an audit entry for the user who is currently logged in.
@@ -93,15 +93,15 @@ public class AuditLogService {
                 || authentication instanceof AnonymousAuthenticationToken) {
             return SYSTEM_USER_ID;
         }
-        return userRepository.findUserByUsername(authentication.getName()).map(User::getId).orElse(SYSTEM_USER_ID);
+        return authentication.getPrincipal() instanceof TokenUser user ? user.id() : SYSTEM_USER_ID;
     }
 
     private String describeActor(Long userId) {
         if (userId == null || SYSTEM_USER_ID.equals(userId)) {
             return "System";
         }
-        return userRepository.findById(userId)
-                .map(user -> user.getUsername() + " (id " + userId + ")")
+        return memberRepository.findById(userId)
+                .map(member -> member.getUsername() + " (id " + userId + ")")
                 .orElse("user #" + userId);
     }
 

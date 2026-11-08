@@ -30,8 +30,8 @@ public class FineChannel implements AuditChannel {
     public String getReadableLog(AuditTriggerInfo info) {
         String target = fineRepository.findById(info.whatId())
                 .map(f -> f.getType().name().toLowerCase() + " fine #" + f.getId() + " of " + f.getAmount()
-                        + " for loan #" + f.getLoan().getId() + " ('" + f.getLoan().getBook().getTitle()
-                        + "' for " + f.getLoan().getUser().getUsername() + ")")
+                        + " for loan #" + f.getLoan().getId() + " ('" + f.getLoan().getBookTitle()
+                        + "' for " + f.getLoan().getUsername() + ")")
                 .orElse("fine #" + info.whatId());
         return info.action().toLowerCase() + " " + target;
     }

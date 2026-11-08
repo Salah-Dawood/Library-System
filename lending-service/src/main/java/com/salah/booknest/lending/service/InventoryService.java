@@ -4,12 +4,10 @@ import com.salah.booknest.lending.exception.InformationExistException;
 import com.salah.booknest.lending.exception.InformationNotFoundException;
 import com.salah.booknest.lending.exception.InvalidRequestException;
 import com.salah.booknest.lending.exception.InvalidStateException;
-import com.salah.booknest.lending.model.Book;
 import com.salah.booknest.lending.model.Inventory;
 import com.salah.booknest.lending.model.LoanStatus;
 import com.salah.booknest.lending.model.request.InventoryRequest;
 import com.salah.booknest.lending.model.response.InventoryResponse;
-import com.salah.booknest.lending.repository.BookRepository;
 import com.salah.booknest.lending.repository.InventoryRepository;
 import com.salah.booknest.lending.repository.LoanRepository;
 import lombok.RequiredArgsConstructor;
@@ -28,7 +26,6 @@ import java.util.List;
 public class InventoryService {
 
     private final InventoryRepository inventoryRepository;
-    private final BookRepository bookRepository;
     private final LoanRepository loanRepository;
     private final InventoryLocker inventoryLocker;
     private final WaitlistService waitlistService;
@@ -46,11 +43,10 @@ public class InventoryService {
         if (inventoryRepository.findByBookId(request.bookId()).isPresent()) {
             throw new InformationExistException("Stock for book " + request.bookId() + " already exists");
         }
-        Book book = bookRepository.findById(request.bookId())
-                .orElseThrow(() -> new InformationNotFoundException("Book with ID " + request.bookId() + " not found"));
 
         Inventory inventory = new Inventory();
-        inventory.setBook(book);
+        inventory.setBookId(request.bookId());
+        inventory.setBookTitle(request.bookTitle());
         inventory.setTotalCopies(request.totalCopies());
         inventory.setAvailableCopies(request.totalCopies());
         return InventoryResponse.from(inventoryRepository.save(inventory));
@@ -89,7 +85,7 @@ public class InventoryService {
 
     /**
      * Takes a book out of lending: refused while a copy is on loan or a return is waiting for review,
-     * otherwise everyone waiting for it is removed from the waitlist.
+     * otherwise everyone waiting for it is removed from the waitlist and the book can no longer be borrowed.
      */
     @Transactional
     public void retire(Long bookId) {
@@ -99,5 +95,6 @@ public class InventoryService {
             throw new InvalidStateException("Book is on loan or has returns waiting for review and cannot be removed");
         }
         waitlistService.cancelAllForBook(bookId);
+        inventoryLocker.lock(bookId).setActive(false);
     }
 }

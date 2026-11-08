@@ -19,10 +19,10 @@ public record WaitlistResponse(
     public static WaitlistResponse from(WaitlistEntry entry, int position) {
         return new WaitlistResponse(
                 entry.getId(),
-                entry.getBook().getId(),
-                entry.getBook().getTitle(),
-                entry.getUser().getId(),
-                entry.getUser().getUsername(),
+                entry.getBookId(),
+                entry.getBookTitle(),
+                entry.getUserId(),
+                entry.getUsername(),
                 entry.getStatus(),
                 position,
                 entry.getHoldExpiresAt(),

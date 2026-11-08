@@ -3,17 +3,16 @@ package com.salah.booknest.lending.demo;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.salah.booknest.lending.exception.InformationNotFoundException;
 import com.salah.booknest.lending.exception.InvalidStateException;
-import com.salah.booknest.lending.model.Book;
 import com.salah.booknest.lending.model.Inventory;
 import com.salah.booknest.lending.model.Loan;
 import com.salah.booknest.lending.model.LoanStatus;
-import com.salah.booknest.lending.model.User;
+import com.salah.booknest.lending.model.Member;
 import com.salah.booknest.lending.model.request.LoanRequest;
 import com.salah.booknest.lending.model.response.LoanResponse;
-import com.salah.booknest.lending.repository.BookRepository;
 import com.salah.booknest.lending.repository.InventoryRepository;
 import com.salah.booknest.lending.repository.LoanRepository;
-import com.salah.booknest.lending.repository.UserRepository;
+import com.salah.booknest.lending.repository.MemberRepository;
+import com.salah.booknest.lending.security.TokenUser;
 import com.salah.booknest.lending.service.LoanService;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
@@ -50,8 +49,7 @@ public class RaceDemoService {
     private final TransactionTemplate transactionTemplate;
     private final LoanService loanService;
     private final LoanRepository loanRepository;
-    private final UserRepository userRepository;
-    private final BookRepository bookRepository;
+    private final MemberRepository memberRepository;
     private final EntityManager entityManager;
 
     /**
@@ -109,9 +107,9 @@ public class RaceDemoService {
      * is used, which locks the member first. The loans created here are removed again afterwards.
      */
     public LoanLimitRaceResult runLoanLimit(String username, int threads, boolean safe) throws InterruptedException {
-        User user = userRepository.findUserByUsername(username)
-                .orElseThrow(() -> new InformationNotFoundException("Username " + username + " not found"));
-        Long userId = user.getId();
+        Member member = memberRepository.findByUsername(username)
+                .orElseThrow(() -> new InformationNotFoundException("Member " + username + " not found"));
+        Long userId = member.getId();
         int loansBefore = countActiveLoans(userId);
         List<Long> bookIds = findFreeBooks(userId, threads);
         if (bookIds.size() < threads) {
@@ -119,7 +117,7 @@ public class RaceDemoService {
         }
 
         Authentication authentication = new UsernamePasswordAuthenticationToken(
-                username, null, List.of(new SimpleGrantedAuthority("ROLE_member")));
+                new TokenUser(userId, username), null, List.of(new SimpleGrantedAuthority("ROLE_member")));
         List<Long> createdLoanIds = new CopyOnWriteArrayList<>();
         int borrowed = 0;
         ExecutorService pool = Executors.newFixedThreadPool(threads);
@@ -182,15 +180,17 @@ public class RaceDemoService {
                 return false;
             }
             pause();
-            Inventory inventory = inventoryRepository.findByBookIdForUpdate(bookId).orElseThrow(() -> notFound(bookId));
+            Inventory inventory = inventoryRepository.findWithLockByBookId(bookId).orElseThrow(() -> notFound(bookId));
             if (inventory.getAvailableCopies() < 1) {
                 return false;
             }
             inventory.setAvailableCopies(inventory.getAvailableCopies() - 1);
 
             Loan loan = new Loan();
-            loan.setUser(userRepository.getReferenceById(userId));
-            loan.setBook(inventory.getBook());
+            loan.setUserId(userId);
+            loan.setUsername(memberRepository.getReferenceById(userId).getUsername());
+            loan.setBookId(inventory.getBookId());
+            loan.setBookTitle(inventory.getBookTitle());
             loan.setStatus(LoanStatus.BORROWED);
             loan.setRequestedDays(7);
             loan.setLoanDate(LocalDate.now());
@@ -206,14 +206,13 @@ public class RaceDemoService {
     private List<Long> findFreeBooks(Long userId, int count) {
         List<Long> bookIds = new ArrayList<>();
         transactionTemplate.executeWithoutResult(status -> {
-            for (Book book : bookRepository.findAll()) {
+            for (Inventory inventory : inventoryRepository.findAll()) {
                 if (bookIds.size() == count) {
                     break;
                 }
-                Inventory inventory = book.getInventory();
-                boolean free = Boolean.TRUE.equals(book.getActive()) && inventory != null && inventory.getAvailableCopies() >= 1;
-                if (free && !loanRepository.existsByUserIdAndBookIdAndStatusIn(userId, book.getId(), ACTIVE_LOANS)) {
-                    bookIds.add(book.getId());
+                boolean free = Boolean.TRUE.equals(inventory.getActive()) && inventory.getAvailableCopies() >= 1;
+                if (free && !loanRepository.existsByUserIdAndBookIdAndStatusIn(userId, inventory.getBookId(), ACTIVE_LOANS)) {
+                    bookIds.add(inventory.getBookId());
                 }
             }
         });
@@ -232,9 +231,9 @@ public class RaceDemoService {
                 if (loan.isEmpty()) {
                     return;
                 }
-                Long bookId = loan.get().getBook().getId();
+                Long bookId = loan.get().getBookId();
                 loanRepository.delete(loan.get());
-                Inventory inventory = inventoryRepository.findByBookIdForUpdate(bookId).orElseThrow(() -> notFound(bookId));
+                Inventory inventory = inventoryRepository.findWithLockByBookId(bookId).orElseThrow(() -> notFound(bookId));
                 inventory.setAvailableCopies(Math.min(inventory.getTotalCopies(), inventory.getAvailableCopies() + 1));
             });
         }
@@ -243,7 +242,7 @@ public class RaceDemoService {
     private boolean takeCopy(Long bookId, boolean safe) {
         Inventory inventory;
         if (safe) {
-            inventory = inventoryRepository.findByBookIdForUpdate(bookId).orElseThrow(() -> notFound(bookId));
+            inventory = inventoryRepository.findWithLockByBookId(bookId).orElseThrow(() -> notFound(bookId));
         } else {
             inventory = inventoryRepository.findByBookId(bookId).orElseThrow(() -> notFound(bookId));
         }

@@ -10,7 +10,7 @@ import com.salah.booknest.lending.model.request.ReviewReturnRequest;
 import com.salah.booknest.lending.model.response.LoanResponse;
 import com.salah.booknest.lending.model.response.NotificationEvent;
 import com.salah.booknest.lending.model.response.ReturnStats;
-import com.salah.booknest.lending.repository.BookRepository;
+import com.salah.booknest.lending.repository.InventoryRepository;
 import com.salah.booknest.lending.repository.FineRepository;
 import com.salah.booknest.lending.repository.LoanRepository;
 import com.salah.booknest.lending.security.Roles;
@@ -48,14 +48,13 @@ public class LoanService {
             Set.of("id", "createdAt", "loanDate", "dueDate", "returnDate", "status");
 
     private final LoanRepository loanRepository;
-    private final BookRepository bookRepository;
+    private final InventoryRepository inventoryRepository;
     private final InventoryLocker inventoryLocker;
     private final FineRepository fineRepository;
     private final NotificationService notificationService;
     private final AuditLogService auditLogService;
-    private final AppSharedService appSharedService;
+    private final MemberService memberService;
     private final WaitlistService waitlistService;
-    private final AsyncEmailService asyncEmailService;
 
 
     /**
@@ -75,7 +74,7 @@ public class LoanService {
 
     @Transactional(readOnly = true)
     public Page<LoanResponse> getMyLoans(Authentication authentication, int page, int size, String sortBy, String sortDir) {
-        return getByUserId(appSharedService.getUserFromAuth(authentication).getId(), page, size, sortBy, sortDir);
+        return getByUserId(MemberService.tokenUser(authentication).id(), page, size, sortBy, sortDir);
     }
 
     @Transactional(readOnly = true)
@@ -108,30 +107,30 @@ public class LoanService {
         }
 
         long started = System.currentTimeMillis();
-        User user = appSharedService.getUserFromAuthForUpdate(authentication);
-        log.info("Borrow started: user={} book={} days={}", user.getId(), request.getBookId(), days);
-        Book book = bookRepository.findById(request.getBookId()).orElseThrow(
+        Member member = memberService.lockCurrentMember(authentication);
+        log.info("Borrow started: user={} book={} days={}", member.getId(), request.getBookId(), days);
+        Inventory stock = inventoryRepository.findByBookId(request.getBookId()).orElseThrow(
                 () -> new InformationNotFoundException("Book with ID " + request.getBookId() + " not found"));
-        if (!Boolean.TRUE.equals(book.getActive())) {
+        if (!Boolean.TRUE.equals(stock.getActive())) {
             throw new InvalidStateException("This book is no longer available");
         }
 
-        if (loanRepository.existsByUserIdAndBookIdAndStatusIn(user.getId(), book.getId(), ACTIVE_STATUSES)) {
+        if (loanRepository.existsByUserIdAndBookIdAndStatusIn(member.getId(), stock.getBookId(), ACTIVE_STATUSES)) {
             throw new InformationExistException("You already have this book on loan");
         }
-        if (loanRepository.countByUserIdAndStatusIn(user.getId(), ACTIVE_STATUSES) >= MAX_ACTIVE_LOANS) {
+        if (loanRepository.countByUserIdAndStatusIn(member.getId(), ACTIVE_STATUSES) >= MAX_ACTIVE_LOANS) {
             throw new InvalidStateException("You can have at most " + MAX_ACTIVE_LOANS + " books on loan", "LOAN_LIMIT_REACHED");
         }
 
-        Inventory inventory = inventoryLocker.lock(book.getId());
+        Inventory inventory = inventoryLocker.lock(stock.getBookId());
         if (inventory.getAvailableCopies() < 1) {
-            throw new InvalidStateException("No copies of \"" + book.getTitle() + "\" are available", "NO_COPIES_AVAILABLE");
+            throw new InvalidStateException("No copies of \"" + inventory.getBookTitle() + "\" are available", "NO_COPIES_AVAILABLE");
         }
         inventory.setAvailableCopies(inventory.getAvailableCopies() - 1);
 
-        Loan loan = createLoan(user, book, days);
+        Loan loan = createLoan(member, inventory.getBookId(), inventory.getBookTitle(), days);
         log.info("Borrow completed: loan={} user={} book={} copiesLeft={} in {} ms",
-                loan.getId(), user.getId(), book.getId(), inventory.getAvailableCopies(), System.currentTimeMillis() - started);
+                loan.getId(), member.getId(), inventory.getBookId(), inventory.getAvailableCopies(), System.currentTimeMillis() - started);
         return LoanResponse.from(loan);
     }
 
@@ -146,13 +145,13 @@ public class LoanService {
     public LoanResponse cancel(Long loanId) {
         Loan loan = getLoanForUpdate(loanId);
         requireTransition(loan, LoanStatus.CANCELLED);
-        giveCopyBack(loan.getBook().getId());
+        giveCopyBack(loan.getBookId());
 
         loan.setStatus(LoanStatus.CANCELLED);
         auditLogService.log("LOAN", "CANCELLED", loanId);
-        log.info("Loan {} cancelled, book {}", loanId, loan.getBook().getId());
+        log.info("Loan {} cancelled, book {}", loanId, loan.getBookId());
         notifyMember(loan, "LOAN_CANCELLED",
-                "Your loan of \"" + loan.getBook().getTitle() + "\" was cancelled by a librarian");
+                "Your loan of \"" + loan.getBookTitle() + "\" was cancelled by a librarian");
         return LoanResponse.from(loan);
     }
 
@@ -169,7 +168,7 @@ public class LoanService {
     @Transactional
     public LoanResponse returnLoan(Long loanId, Authentication authentication) {
         Loan loan = getLoanForUpdate(loanId);
-        boolean owner = loan.getUser().getUsername().equals(authentication.getName());
+        boolean owner = loan.getUsername().equals(authentication.getName());
         if (!owner && !Roles.isLibrarian(authentication)) {
             throw new AccessDeniedException("You can only return your own loans");
         }
@@ -186,12 +185,12 @@ public class LoanService {
 
         String timing = describeTiming(ReturnTiming.daysLate(loan.getDueDate(), loan.getReturnDate()));
         auditLogService.log("LOAN", "RETURNED", loanId);
-        log.info("Return registered: loan={} book={} by={} {}", loanId, loan.getBook().getId(), authentication.getName(), timing);
+        log.info("Return registered: loan={} book={} by={} {}", loanId, loan.getBookId(), authentication.getName(), timing);
 
-        String title = loan.getBook().getTitle();
+        String title = loan.getBookTitle();
         if (owner) {
             notifyLibrarians(loan, "LOAN_RETURNED",
-                    loan.getUser().getUsername() + " returned \"" + title + "\" " + timing + ". Waiting for review");
+                    loan.getUsername() + " returned \"" + title + "\" " + timing + ". Waiting for review");
         } else {
             notifyMember(loan, "LOAN_RETURNED",
                     "\"" + title + "\" was marked as returned " + timing + ". It is waiting for a librarian's review");
@@ -232,9 +231,9 @@ public class LoanService {
         boolean late = ReturnTiming.of(daysLate) == ReturnTiming.LATE;
 
         if (request.damaged()) {
-            withdrawCopy(loan.getBook().getId());
+            withdrawCopy(loan.getBookId());
         } else {
-            giveCopyBack(loan.getBook().getId());
+            giveCopyBack(loan.getBookId());
         }
 
         BigDecimal fineAmount = request.fineAmount();
@@ -251,14 +250,14 @@ public class LoanService {
         loan.setStatus(LoanStatus.RETURNED);
         loan.setDamaged(request.damaged());
         loan.setReviewNotes(notes);
-        loan.setReviewedBy(appSharedService.getUserFromAuth(librarian));
+        loan.setReviewedBy(librarian.getName());
         loan.setReviewedAt(LocalDateTime.now());
 
         auditLogService.log("LOAN", request.damaged() ? "RETURN_DAMAGED" : "RETURN_CLEARED", loanId);
         log.info("Return reviewed: loan={} book={} by={} damaged={} fined={}",
-                loanId, loan.getBook().getId(), librarian.getName(), request.damaged(), fined);
+                loanId, loan.getBookId(), librarian.getName(), request.damaged(), fined);
 
-        String title = loan.getBook().getTitle();
+        String title = loan.getBookTitle();
         String message = request.damaged()
                 ? "Your return of \"" + title + "\" was reviewed: damage was found" + (notes == null ? "" : " (" + notes + ")")
                 : "Your return of \"" + title + "\" was reviewed and accepted. Thank you!";
@@ -284,9 +283,9 @@ public class LoanService {
             throw new InvalidRequestException("Loan duration must be between 1 and " + MAX_LOAN_DAYS + " days");
         }
         // the member is locked first (same order as borrow: member, then book), so two claims cannot pass the 5 book limit together
-        appSharedService.getUserFromAuthForUpdate(authentication);
+        Member member = memberService.lockCurrentMember(authentication);
         WaitlistEntry entry = waitlistService.getEntryLocked(entryId);
-        if (!entry.getUser().getUsername().equals(authentication.getName())) {
+        if (!entry.getUserId().equals(member.getId())) {
             throw new AccessDeniedException("This is not your hold");
         }
         if (entry.getStatus() != WaitlistStatus.HOLD_READY) {
@@ -295,28 +294,27 @@ public class LoanService {
         if (entry.getHoldExpiresAt().isBefore(LocalDateTime.now())) {
             throw new InvalidStateException("Your hold has expired", "HOLD_EXPIRED");
         }
-        User user = entry.getUser();
-        if (loanRepository.countByUserIdAndStatusIn(user.getId(), ACTIVE_STATUSES) >= MAX_ACTIVE_LOANS) {
+        if (loanRepository.countByUserIdAndStatusIn(member.getId(), ACTIVE_STATUSES) >= MAX_ACTIVE_LOANS) {
             throw new InvalidStateException("You can have at most " + MAX_ACTIVE_LOANS + " books on loan", "LOAN_LIMIT_REACHED");
         }
 
         entry.setStatus(WaitlistStatus.FULFILLED);
-        Loan loan = createLoan(user, entry.getBook(), days);
+        Loan loan = createLoan(member, entry.getBookId(), entry.getBookTitle(), days);
         auditLogService.log("WAITLIST", "CLAIMED", entryId);
-        log.info("Hold claimed: entry={} user={} book={} loan={}", entryId, user.getId(), entry.getBook().getId(), loan.getId());
+        log.info("Hold claimed: entry={} user={} book={} loan={}", entryId, member.getId(), entry.getBookId(), loan.getId());
         return LoanResponse.from(loan);
     }
 
 
     @Transactional(readOnly = true)
     public ReturnStats getMyStats(Authentication authentication) {
-        return getStats((appSharedService.getUserFromAuth(authentication)).getId());
+        return getStats(MemberService.tokenUser(authentication).id());
     }
 
     /** True if the logged-in member has a returned and cleared loan of this book (needed to review it). */
     @Transactional(readOnly = true)
     public boolean hasReturned(Authentication authentication, Long bookId) {
-        Long userId = appSharedService.getUserFromAuth(authentication).getId();
+        Long userId = MemberService.tokenUser(authentication).id();
         return loanRepository.existsByUserIdAndBookIdAndStatusIn(userId, bookId, List.of(LoanStatus.RETURNED));
     }
 
@@ -356,11 +354,13 @@ public class LoanService {
                 .orElseThrow(() -> new InformationNotFoundException("Loan with ID " + loanId + " not found"));
     }
 
-    private Loan createLoan(User user, Book book, int days) {
+    private Loan createLoan(Member member, Long bookId, String bookTitle, int days) {
         LocalDate today = LocalDate.now();
         Loan loan = new Loan();
-        loan.setUser(user);
-        loan.setBook(book);
+        loan.setUserId(member.getId());
+        loan.setUsername(member.getUsername());
+        loan.setBookId(bookId);
+        loan.setBookTitle(bookTitle);
         loan.setStatus(LoanStatus.BORROWED);
         loan.setRequestedDays(days);
         loan.setLoanDate(today);
@@ -418,22 +418,9 @@ public class LoanService {
     }
 
     private void notifyMember(Loan loan, String type, String message) {
-        String username = loan.getUser().getUsername();
-        String email = loan.getUser().getEmailAddress();
+        String username = loan.getUsername();
         NotificationEvent event = newEvent(loan, type, message);
-        TransactionUtils.afterCommit(() -> {
-            notificationService.notifyUser(username, event);
-            asyncEmailService.sendNotificationEmail(username, email, emailSubject(type), message);
-        });
-    }
-
-    private String emailSubject(String type) {
-        return switch (type) {
-            case "LOAN_CANCELLED" -> "BookNest - Your loan was cancelled";
-            case "LOAN_RETURNED" -> "BookNest - We received your return";
-            case "RETURN_REVIEWED" -> "BookNest - Your return was reviewed";
-            default -> "BookNest - Update about your loan";
-        };
+        TransactionUtils.afterCommit(() -> notificationService.notifyUser(username, event));
     }
 
     private void notifyLibrarians(Loan loan, String type, String message) {

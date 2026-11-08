@@ -15,7 +15,7 @@ public class InventoryLocker {
     private final EntityManager entityManager;
 
     public Inventory lock(Long bookId) {
-        Inventory inventory = inventoryRepository.findByBookIdForUpdate(bookId)
+        Inventory inventory = inventoryRepository.findWithLockByBookId(bookId)
                 .orElseThrow(() -> new InformationNotFoundException("Inventory for book " + bookId + " not found"));
         // the row may already be loaded with old numbers, so read it again after the lock
         entityManager.refresh(inventory);

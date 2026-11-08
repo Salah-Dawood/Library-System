@@ -53,10 +53,10 @@ public record LoanResponse(
 
         return new LoanResponse(
                 loan.getId(),
-                loan.getBook().getId(),
-                loan.getBook().getTitle(),
-                loan.getUser().getId(),
-                loan.getUser().getUsername(),
+                loan.getBookId(),
+                loan.getBookTitle(),
+                loan.getUserId(),
+                loan.getUsername(),
                 loan.getStatus(),
                 loan.getRequestedDays(),
                 loan.getLoanDate(),
@@ -66,7 +66,7 @@ public record LoanResponse(
                 timing,
                 daysLate,
                 overdue,
-                loan.getReviewedBy() == null ? null : loan.getReviewedBy().getUsername(),
+                loan.getReviewedBy(),
                 loan.getReviewedAt(),
                 loan.getDamaged(),
                 loan.getReviewNotes(),

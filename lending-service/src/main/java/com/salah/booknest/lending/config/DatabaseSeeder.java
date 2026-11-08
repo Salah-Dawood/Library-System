@@ -1,25 +1,25 @@
 package com.salah.booknest.lending.config;
 
-import com.salah.booknest.lending.exception.InformationNotFoundException;
-import com.salah.booknest.lending.model.*;
-import com.salah.booknest.lending.repository.AuthorRepository;
-import com.salah.booknest.lending.repository.BookRepository;
-import com.salah.booknest.lending.repository.GenreRepository;
-import com.salah.booknest.lending.repository.UserRepository;
-import jakarta.transaction.Transactional;
+import com.salah.booknest.lending.model.Inventory;
+import com.salah.booknest.lending.model.Member;
+import com.salah.booknest.lending.repository.InventoryRepository;
+import com.salah.booknest.lending.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
+/**
+ * Seeds lending's copy of the sample users and the stock of the sample books.
+ * user-service seeds the same users and catalog-service the same books, in the same order,
+ * so on empty databases the ids match (users 1 to 4, books 1 to 16).
+ */
 @Component
 @Profile("!test")
 @Order(1)
@@ -27,175 +27,52 @@ import java.util.concurrent.ThreadLocalRandom;
 @RequiredArgsConstructor
 public class DatabaseSeeder implements CommandLineRunner {
 
-    private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
-    private final AuthorRepository authorRepository;
-    private final GenreRepository genreRepository;
-    private final BookRepository bookRepository;
+    private static final List<String> MEMBERS = List.of("librarian", "johnd", "janed", "alexm");
+
+    private static final List<String> BOOK_TITLES = List.of(
+            "1984",
+            "Animal Farm",
+            "Harry Potter and the Sorcerer's Stone",
+            "Harry Potter and the Order of the Phoenix",
+            "The Hobbit",
+            "The Fellowship of the Ring",
+            "The Two Towers",
+            "To Kill a Mockingbird",
+            "All Quiet on the Western Front",
+            "The Road Back",
+            "Foundation",
+            "I, Robot",
+            "Murder on the Orient Express",
+            "And Then There Were None",
+            "Dune",
+            "Dune Messiah");
+
+    private final MemberRepository memberRepository;
+    private final InventoryRepository inventoryRepository;
 
     @Override
     @Transactional
-    public void run(String... args) throws Exception {
-        if (userRepository.count() == 0) {
-
-            //librarian
-            seedLibrarian("librarian","Salah","Dawood","salah.dawood364@gmail.com");
-
-            // 2.members
-            seedMember("johnd", "John", "Doe", "202200240@student.polytechnic.bh");
-            seedMember("janed", "Jane", "Smith", "jane.smith@yahoo.com");
-            seedMember("alexm", "Alex", "Miller", "alex.miller@outlook.com");
-
-            //authors
-            seedAuthor("George Orwell", 1903, "United Kingdom");
-            seedAuthor("J.K. Rowling", 1965, "United Kingdom");
-            seedAuthor("J.R.R. Tolkien", 1892, "United Kingdom");
-            seedAuthor("Harper Lee", 1926, "USA");
-            seedAuthor("Erich Maria Remarque", 1898, "Germany");
-            seedAuthor("Isaac Asimov", 1920, "USA");
-            seedAuthor("Agatha Christie", 1890, "United Kingdom");
-            seedAuthor("Frank Herbert", 1920, "USA");
-
-            // 4. Genres ( IDs will be assigned sequentially by DB: 1, 2, 3...)
-            seedGenre("Dystopian", "Speculative fiction exploring social and political structures."); // ID: 1
-            seedGenre("Fantasy", "Magical elements, wonder, and mythical worlds.");               // ID: 2
-            seedGenre("Fiction", "Narrative writing drawn from the imagination.");                 // ID:3
-            seedGenre("War", "Focuses on conflicts, military life, and political trauma.");        // ID: 4
-            seedGenre("Sci-Fi", "Futuristic settings, advanced technology, and space exploration."); // ID:5
-            seedGenre("Mystery", "Solving a crime, dealing with secrets and investigations.");     // ID: 6
-            seedGenre("Thriller", "Suspenseful, fast-paced narratives with high stakes.");         // ID:7
-            seedGenre("History", "Fictional accounts set against accurate historical backdrops.");   // ID: 8
-
-            // books)
-            // George Orwell
-            seedBook("1984", "9780451524935", 1949, "George Orwell", List.of(1L, 3L, 5L)); // Dystopian, Fiction, Sci-Fi
-            seedBook("Animal Farm", "9780451526342", 1945, "George Orwell", List.of(1L, 3L)); // Dystopian, Fiction
-
-            // J.K. Rowling
-            seedBook("Harry Potter and the Sorcerer's Stone", "9780590353427", 1997, "J.K. Rowling", List.of(2L, 3L)); // Fantasy, Fiction
-            seedBook("Harry Potter and the Order of the Phoenix", "9780439358071", 2003, "J.K. Rowling", List.of(2L, 6L)); // Fantasy, Mystery
-
-            // J.R.R. Tolkien
-            seedBook("The Hobbit", "9780007487288", 1937, "J.R.R. Tolkien", List.of(2L)); // Fantasy
-            seedBook("The Fellowship of the Ring", "9780618346257", 1954, "J.R.R. Tolkien", List.of(2L, 4L)); // Fantasy, War (War of the Ring context)
-            seedBook("The Two Towers", "9780618346264", 1954, "J.R.R. Tolkien", List.of(2L, 4L)); // Fantasy, War
-
-            // Harper Lee
-            seedBook("To Kill a Mockingbird", "9780446310789", 1960, "Harper Lee", List.of(3L, 6L, 8L)); // Fiction, Mystery (the trial), History
-
-            // Erich Maria Remarque
-            seedBook("All Quiet on the Western Front", "9780449213940", 1929, "Erich Maria Remarque", List.of(3L, 4L, 8L)); // Fiction, War, History
-            seedBook("The Road Back", "9780449912461", 1931, "Erich Maria Remarque", List.of(3L, 4L)); // Fiction, War (Post-war trauma)
-
-            // Isaac Asimov
-            seedBook("Foundation", "9780553293357", 1951, "Isaac Asimov", List.of(1L, 5L)); // Dystopian (Fall of Empire), Sci-Fi
-            seedBook("I, Robot", "9780553382563", 1950, "Isaac Asimov", List.of(5L, 6L, 7L)); // Sci-Fi, Mystery (detective framing), Thriller
-
-            // Agatha Christie
-            seedBook("Murder on the Orient Express", "9780062073501", 1934, "Agatha Christie", List.of(6L, 7L)); // Mystery, Thriller
-            seedBook("And Then There Were None", "9780062073488", 1939, "Agatha Christie", List.of(3L, 6L, 7L)); // Fiction, Mystery, Thriller
-
-            // Frank Herbert
-            seedBook("Dune", "9780441172719", 1965, "Frank Herbert", List.of(1L, 2L, 4L, 5L)); // Dystopian, Fantasy, War, Sci-Fi
-            seedBook("Dune Messiah", "9780441172696", 1969, "Frank Herbert", List.of(1L, 4L, 5L)); // Dystopian, War, Sci-Fi
-
-            log.info("Database successfully seeded!");
-        } else {
-            log.info("Database already has data. Skipping seeding.");
+    public void run(String... args) {
+        if (inventoryRepository.count() > 0) {
+            log.info("Stock already exists. Skipping seeding.");
+            return;
         }
-    }
-
-    public void seedLibrarian(String username,String firstName,String lastName,String email){
-        User librarian = new User();
-        librarian.setUsername(username);
-        librarian.setEmailAddress(email);
-        librarian.setIsVerified(true);
-        librarian.setPassword(passwordEncoder.encode("password"));
-        librarian.setRole("librarian");
-
-        //Seed Librarian Profile
-        UserProfile libProfile = new UserProfile();
-        libProfile.setFirstName(firstName);
-        libProfile.setLastName(lastName);
-        libProfile.setBio("I am a librarian");
-        libProfile.setAge(22);
-        libProfile.setUser(librarian);
-        librarian.setUserProfile(libProfile);
-
-        userRepository.save(librarian);
-    }
-
-    public void seedMember(String username,String firstName,String lastName,String email){
-        //Seed a Member Account
-        User member = new User();
-        member.setUsername(username);
-        member.setEmailAddress(email);
-        member.setIsVerified(true);
-        member.setPassword(passwordEncoder.encode("password"));
-
-        //Seed Member Profile
-        UserProfile memProfile = new UserProfile();
-        memProfile.setFirstName(firstName);
-        memProfile.setLastName(lastName);
-        memProfile.setAge(randomAge());
-        memProfile.setBio("I LOVE BOOKS");
-        memProfile.setUser(member);
-        member.setUserProfile(memProfile);
-
-        userRepository.save(member);
-    }
-
-    public int randomAge(){
-        return ThreadLocalRandom.current().nextInt(16, 76);
-    }
-
-    public void seedAuthor(String name,Integer birthYear,String nationality){
-        Author author = new Author();
-
-        author.setName(name);
-        author.setBirthYear(birthYear);
-        author.setNationality(nationality);
-
-        authorRepository.save(author);
-    }
-
-    public void seedGenre(String name,String description){
-        Genre genre = new Genre();
-
-        genre.setName(name);
-        genre.setDescription(description);
-
-        genreRepository.save(genre);
-    }
-
-    @Transactional
-    public void seedBook(String title,String isbn,Integer year,String authorName,List<Long> genreIds){
-        Book book = new Book();
-
-        book.setTitle(title);
-        book.setIsbn(isbn);
-        book.setPublishedYear(year);
-
-        book.setAuthor(authorRepository.findByName(authorName).orElseThrow(() -> new InformationNotFoundException("Author not found from seeder: " + authorName)));
-        Set<Genre> genres = new HashSet<>();
-
-        for (Long genreId : genreIds) {
-            genres.add(genreRepository.findById(genreId).orElseThrow(() -> new InformationNotFoundException("Genre with id " + genreId + " not found from seeder")));
+        for (int i = 0; i < MEMBERS.size(); i++) {
+            memberRepository.save(new Member((long) i + 1, MEMBERS.get(i)));
         }
-        book.setGenres(genres);
+        for (int i = 0; i < BOOK_TITLES.size(); i++) {
+            seedStock((long) i + 1, BOOK_TITLES.get(i));
+        }
+        log.info("Members and stock successfully seeded!");
+    }
 
+    private void seedStock(Long bookId, String title) {
+        int copies = ThreadLocalRandom.current().nextInt(5, 20);
         Inventory inventory = new Inventory();
-        Integer copies = randomCopies();
-        inventory.setBook(book);
+        inventory.setBookId(bookId);
+        inventory.setBookTitle(title);
         inventory.setTotalCopies(copies);
         inventory.setAvailableCopies(copies);
-
-        book.setInventory(inventory);
-        bookRepository.save(book);
-
-    }
-
-    public int randomCopies(){
-        return ThreadLocalRandom.current().nextInt(5, 20);
+        inventoryRepository.save(inventory);
     }
 }

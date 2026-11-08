@@ -1,63 +1,42 @@
 package com.salah.booknest.lending.security;
 
+import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.List;
 
+/**
+ * Logs the caller in from the token alone: the user id, username and role are claims of the token.
+ */
 @Component
+@RequiredArgsConstructor
 public class JwtRequestFilter extends OncePerRequestFilter {
 
-    @Autowired
-    private MyUserDetailsService myUserDetailsService;
-
-    @Autowired
-    private JWTUtils jwtUtils;
-
-    private String parseJwt(HttpServletRequest request) {
-        String headerAuth = request.getHeader("Authorization");
-        if (StringUtils.hasText(headerAuth) && headerAuth.startsWith("Bearer ")) {
-            return headerAuth.substring(7);
-        }
-        return null;
-    }
-
-
-    @Override
-    protected boolean shouldNotFilterAsyncDispatch() {
-        return false;
-    }
+    private final JWTUtils jwtUtils;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
-        try {
-            String jwt = parseJwt(request);
-            // A password-reset token must never work as a login token.
-            if (jwt != null && jwtUtils.validateJwtToken(jwt) && !jwtUtils.isPasswordResetToken(jwt)) {
-                String username = jwtUtils.getUserNameFromJwtToken(jwt);
-                UserDetails userDetails = this.myUserDetailsService.loadUserByUsername(username);
-
-                // A deactivated user stays locked out even while an old token is still valid.
-                if (userDetails.isEnabled()) {
-                    UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                            userDetails, null, userDetails.getAuthorities());
-                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(authentication);
-                }
+        String header = request.getHeader("Authorization");
+        if (StringUtils.hasText(header) && header.startsWith("Bearer ")) {
+            Claims claims = jwtUtils.getLoginClaims(header.substring(7));
+            if (claims != null && claims.get("userId") != null && claims.get("role") != null) {
+                TokenUser user = new TokenUser(claims.get("userId", Long.class), claims.getSubject());
+                var authority = new SimpleGrantedAuthority("ROLE_" + claims.get("role", String.class));
+                SecurityContextHolder.getContext().setAuthentication(
+                        new UsernamePasswordAuthenticationToken(user, null, List.of(authority)));
             }
-        } catch (Exception e) {
-            logger.error("Cannot set user authentication", e);
         }
         filterChain.doFilter(request, response);
     }

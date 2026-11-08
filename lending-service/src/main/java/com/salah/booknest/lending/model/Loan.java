@@ -16,21 +16,26 @@ import java.util.List;
 @Setter
 @Entity
 @Table(name = "loans")
-@ToString(exclude = {"user", "book", "reviewedBy"})
+@ToString(exclude = "fines")
 public class Loan {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    //the member who borrowed the book
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    // the member who borrowed the book, and the book. Users and books belong to other services,
+    // so only their ids and a copy of the name and title are kept here
+    @Column(name = "user_id", nullable = false)
+    private Long userId;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "book_id", nullable = false)
-    private Book book;
+    @Column
+    private String username;
+
+    @Column(name = "book_id", nullable = false)
+    private Long bookId;
+
+    @Column
+    private String bookTitle;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -49,9 +54,8 @@ public class Loan {
     private LocalDate returnDate;
 
     // Return review: filled in when a librarian inspects the returned copy
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "reviewed_by")
-    private User reviewedBy;
+    @Column(name = "reviewed_by_username")
+    private String reviewedBy;
 
     @Column(name = "reviewed_at")
     private LocalDateTime reviewedAt;

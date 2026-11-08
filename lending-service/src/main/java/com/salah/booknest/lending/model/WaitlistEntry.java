@@ -12,20 +12,25 @@ import java.time.LocalDateTime;
 @Setter
 @Entity
 @Table(name = "waitlist_entries")
-@ToString(exclude = {"user", "book"})
+@ToString
 public class WaitlistEntry {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    // users and books belong to other services, so only their ids and a copy of the name and title are kept
+    @Column(name = "user_id", nullable = false)
+    private Long userId;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "book_id", nullable = false)
-    private Book book;
+    @Column
+    private String username;
+
+    @Column(name = "book_id", nullable = false)
+    private Long bookId;
+
+    @Column
+    private String bookTitle;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)

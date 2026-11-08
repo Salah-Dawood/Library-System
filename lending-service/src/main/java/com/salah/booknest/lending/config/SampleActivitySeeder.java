@@ -1,20 +1,17 @@
 package com.salah.booknest.lending.config;
 
 import com.salah.booknest.lending.exception.InformationNotFoundException;
-import com.salah.booknest.lending.model.Book;
 import com.salah.booknest.lending.model.Fine;
 import com.salah.booknest.lending.model.Inventory;
 import com.salah.booknest.lending.model.Loan;
 import com.salah.booknest.lending.model.LoanStatus;
-import com.salah.booknest.lending.model.Review;
-import com.salah.booknest.lending.model.User;
+import com.salah.booknest.lending.model.Member;
 import com.salah.booknest.lending.model.WaitlistEntry;
 import com.salah.booknest.lending.model.WaitlistStatus;
-import com.salah.booknest.lending.repository.BookRepository;
+import com.salah.booknest.lending.repository.InventoryRepository;
 import com.salah.booknest.lending.repository.FineRepository;
 import com.salah.booknest.lending.repository.LoanRepository;
-import com.salah.booknest.lending.repository.ReviewRepository;
-import com.salah.booknest.lending.repository.UserRepository;
+import com.salah.booknest.lending.repository.MemberRepository;
 import com.salah.booknest.lending.repository.WaitlistRepository;
 import com.salah.booknest.lending.service.AuditLogService;
 import lombok.RequiredArgsConstructor;
@@ -32,21 +29,20 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
- * Adds sample loans, reviews and waitlist entries (and their audit entries) for the users and books created by DatabaseSeeder,
+ * Adds sample loans, fines and waitlist entries (and their audit entries) for the members and stock created by DatabaseSeeder,
  * so the whole workflow can be shown straight after startup.
  * Dates are relative to today, so "overdue" or "early" are always true when the app is started.
  */
 @Component
 @Profile("!test")
-@Order(2) // runs after DatabaseSeeder (@Order(1)) has created the users and books
+@Order(2) // runs after DatabaseSeeder (@Order(1)) has created the members and stock
 @Slf4j
 @RequiredArgsConstructor
 public class SampleActivitySeeder implements CommandLineRunner {
 
-    private final UserRepository userRepository;
-    private final BookRepository bookRepository;
+    private final MemberRepository memberRepository;
+    private final InventoryRepository inventoryRepository;
     private final LoanRepository loanRepository;
-    private final ReviewRepository reviewRepository;
     private final FineRepository fineRepository;
     private final AuditLogService auditLogService;
     private final PlatformTransactionManager transactionManager;
@@ -57,41 +53,41 @@ public class SampleActivitySeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        if (loanRepository.count() > 0 || reviewRepository.count() > 0) {
-            log.info("Loans or reviews already exist. Skipping sample activity.");
+        if (loanRepository.count() > 0) {
+            log.info("Loans already exist. Skipping sample activity.");
             return;
         }
         try {
-            // One transaction for everything: if a sample user or book is missing, nothing is saved
+            // One transaction for everything: if a sample member or book is missing, nothing is saved
             new TransactionTemplate(transactionManager).executeWithoutResult(status -> seedSampleActivity());
-            log.info("Sample loans, reviews and waitlist entries successfully seeded!");
+            log.info("Sample loans, fines and waitlist entries successfully seeded!");
         } catch (InformationNotFoundException e) {
             log.warn("Skipping sample activity: {}", e.getMessage());
         }
     }
 
     private void seedSampleActivity() {
-        User librarian = findUser("librarian");
-        User john = findUser("johnd");
-        User jane = findUser("janed");
-        User alex = findUser("alexm");
+        Member librarian = findMember("librarian");
+        Member john = findMember("johnd");
+        Member jane = findMember("janed");
+        Member alex = findMember("alexm");
 
-        Book nineteen84 = findBook("1984");
-        Book animalFarm = findBook("Animal Farm");
-        Book harryPotter = findBook("Harry Potter and the Sorcerer's Stone");
-        Book hobbit = findBook("The Hobbit");
-        Book fellowship = findBook("The Fellowship of the Ring");
-        Book mockingbird = findBook("To Kill a Mockingbird");
-        Book allQuiet = findBook("All Quiet on the Western Front");
-        Book roadBack = findBook("The Road Back");
-        Book foundation = findBook("Foundation");
-        Book iRobot = findBook("I, Robot");
-        Book orientExpress = findBook("Murder on the Orient Express");
-        Book noneLeft = findBook("And Then There Were None");
-        Book dune = findBook("Dune");
-        Book duneMessiah = findBook("Dune Messiah");
-        Book twoTowers = findBook("The Two Towers");
-        Book orderOfPhoenix = findBook("Harry Potter and the Order of the Phoenix");
+        Inventory nineteen84 = findBook("1984");
+        Inventory animalFarm = findBook("Animal Farm");
+        Inventory harryPotter = findBook("Harry Potter and the Sorcerer's Stone");
+        Inventory hobbit = findBook("The Hobbit");
+        Inventory fellowship = findBook("The Fellowship of the Ring");
+        Inventory mockingbird = findBook("To Kill a Mockingbird");
+        Inventory allQuiet = findBook("All Quiet on the Western Front");
+        Inventory roadBack = findBook("The Road Back");
+        Inventory foundation = findBook("Foundation");
+        Inventory iRobot = findBook("I, Robot");
+        Inventory orientExpress = findBook("Murder on the Orient Express");
+        Inventory noneLeft = findBook("And Then There Were None");
+        Inventory dune = findBook("Dune");
+        Inventory duneMessiah = findBook("Dune Messiah");
+        Inventory twoTowers = findBook("The Two Towers");
+        Inventory orderOfPhoenix = findBook("Harry Potter and the Order of the Phoenix");
 
 
         // johnd: a reliable member. Every return was on time or early, which earns the "Reliable member" badge.
@@ -116,15 +112,6 @@ public class SampleActivitySeeder implements CommandLineRunner {
         returnedPendingReview(alex, fellowship, 7, 8, 0);
         cancelledByLibrarian(librarian, alex, noneLeft, 7, 3);
 
-        // Reviews. Only members who returned a book can review it (a catalog-service rule), so every review
-        // below matches a returned loan above. johnd returned "Dune" but has not reviewed it yet, so
-        // the "write a review" step can still be shown live.
-        review(john, nineteen84, 9, "Chilling and still painfully relevant. Hard to put down.");
-        review(john, hobbit, 8, "A cozy adventure with great pacing.");
-        review(alex, hobbit, 9, "The perfect way into Middle-earth.");
-        review(jane, animalFarm, 7, "Short, sharp and surprisingly funny in places.");
-        review(jane, mockingbird, 10, "A moving story with unforgettable characters.");
-
         // Waitlist: "The Two Towers" has one copy and johnd has it, so janed and alexm are waiting in line
         setStock(twoTowers, 1);
         borrowed(john, twoTowers, 14, 4);
@@ -141,20 +128,24 @@ public class SampleActivitySeeder implements CommandLineRunner {
 
     // ---- waitlist ----
 
-    private void waiting(User member, Book book) {
+    private void waiting(Member member, Inventory book) {
         WaitlistEntry entry = new WaitlistEntry();
-        entry.setUser(member);
-        entry.setBook(book);
+        entry.setUserId(member.getId());
+        entry.setUsername(member.getUsername());
+        entry.setBookId(book.getBookId());
+        entry.setBookTitle(book.getBookTitle());
         entry = waitlistRepository.save(entry);
 
         audit("WAITLIST", member, "JOINED", entry.getId());
     }
 
     /** First in line when a copy came back. The copy is held for the member, so it is not available. */
-    private void holdReady(User member, Book book) {
+    private void holdReady(Member member, Inventory book) {
         WaitlistEntry entry = new WaitlistEntry();
-        entry.setUser(member);
-        entry.setBook(book);
+        entry.setUserId(member.getId());
+        entry.setUsername(member.getUsername());
+        entry.setBookId(book.getBookId());
+        entry.setBookTitle(book.getBookTitle());
         entry.setStatus(WaitlistStatus.HOLD_READY);
         entry.setHoldExpiresAt(LocalDateTime.now().plusHours(holdHours));
         entry = waitlistRepository.save(entry);
@@ -167,7 +158,7 @@ public class SampleActivitySeeder implements CommandLineRunner {
     // ---- loan states ----
 
     /** A loan that is still out. It takes one copy from the stock. */
-    private void borrowed(User member, Book book, int days, int loanedDaysAgo) {
+    private void borrowed(Member member, Inventory book, int days, int loanedDaysAgo) {
         Loan loan = newLoan(member, book, LoanStatus.BORROWED, days, loanedDaysAgo);
         loan = loanRepository.save(loan);
         takeCopy(book);
@@ -176,7 +167,7 @@ public class SampleActivitySeeder implements CommandLineRunner {
     }
 
     /** A returned loan a librarian checked and accepted. The copy is back in stock, so the stock is unchanged. */
-    private void returnedAndCleared(User librarian, User member, Book book, int days, int loanedDaysAgo, int returnedDaysAfterDue) {
+    private void returnedAndCleared(Member librarian, Member member, Inventory book, int days, int loanedDaysAgo, int returnedDaysAfterDue) {
         Loan loan = newLoan(member, book, LoanStatus.RETURNED, days, loanedDaysAgo);
         loan.setReturnDate(loan.getDueDate().plusDays(returnedDaysAfterDue));
         markReviewed(loan, librarian, false, null);
@@ -188,7 +179,7 @@ public class SampleActivitySeeder implements CommandLineRunner {
     }
 
     /** A returned loan where the librarian found damage and charged a fine. The copy is withdrawn from stock. */
-    private void returnedDamaged(User librarian, User member, Book book, int days, int loanedDaysAgo,
+    private void returnedDamaged(Member librarian, Member member, Inventory book, int days, int loanedDaysAgo,
                                  int returnedDaysAfterDue, String notes, BigDecimal fineAmount) {
         Loan loan = newLoan(member, book, LoanStatus.RETURNED, days, loanedDaysAgo);
         loan.setReturnDate(loan.getDueDate().plusDays(returnedDaysAfterDue));
@@ -208,7 +199,7 @@ public class SampleActivitySeeder implements CommandLineRunner {
     }
 
     /** A returned loan waiting in the review queue. The copy has not gone back to stock yet. */
-    private void returnedPendingReview(User member, Book book, int days, int loanedDaysAgo, int returnedDaysAfterDue) {
+    private void returnedPendingReview(Member member, Inventory book, int days, int loanedDaysAgo, int returnedDaysAfterDue) {
         Loan loan = newLoan(member, book, LoanStatus.PENDING_REVIEW, days, loanedDaysAgo);
         loan.setReturnDate(loan.getDueDate().plusDays(returnedDaysAfterDue));
         loan = loanRepository.save(loan);
@@ -219,34 +210,22 @@ public class SampleActivitySeeder implements CommandLineRunner {
     }
 
     /** A loan a librarian cancelled while it was out. The copy went back, so the stock is unchanged. */
-    private void cancelledByLibrarian(User librarian, User member, Book book, int days, int loanedDaysAgo) {
+    private void cancelledByLibrarian(Member librarian, Member member, Inventory book, int days, int loanedDaysAgo) {
         Loan loan = loanRepository.save(newLoan(member, book, LoanStatus.CANCELLED, days, loanedDaysAgo));
 
         audit("LOAN", member, "BORROWED", loan.getId());
         audit("LOAN", librarian, "CANCELLED", loan.getId());
     }
 
-    // ---- reviews ----
-
-    private void review(User member, Book book, int rating, String comment) {
-        Review review = new Review();
-        review.setUser(member);
-        review.setUsername(member.getUsername());
-        review.setBook(book);
-        review.setRating(rating);
-        review.setComment(comment);
-        review = reviewRepository.save(review);
-
-        audit("REVIEW", member, "CREATED", review.getId());
-    }
-
     // ---- helpers ----
 
     /** Same dates as LoanService.borrow: loan date is the borrow day, due date is loan date + days. */
-    private Loan newLoan(User member, Book book, LoanStatus status, int days, int loanedDaysAgo) {
+    private Loan newLoan(Member member, Inventory book, LoanStatus status, int days, int loanedDaysAgo) {
         Loan loan = new Loan();
-        loan.setUser(member);
-        loan.setBook(book);
+        loan.setUserId(member.getId());
+        loan.setUsername(member.getUsername());
+        loan.setBookId(book.getBookId());
+        loan.setBookTitle(book.getBookTitle());
         loan.setStatus(status);
         loan.setRequestedDays(days);
         LocalDate loanDate = LocalDate.now().minusDays(loanedDaysAgo);
@@ -255,42 +234,40 @@ public class SampleActivitySeeder implements CommandLineRunner {
         return loan;
     }
 
-    private void markReviewed(Loan loan, User librarian, boolean damaged, String notes) {
+    private void markReviewed(Loan loan, Member librarian, boolean damaged, String notes) {
         loan.setDamaged(damaged);
         loan.setReviewNotes(notes);
-        loan.setReviewedBy(librarian);
+        loan.setReviewedBy(librarian.getUsername());
         loan.setReviewedAt(loan.getReturnDate().atTime(11, 0));
     }
 
     /** A damaged copy leaves circulation: it was already out of the available stock, so only the total drops. */
-    private void withdrawCopy(Book book) {
-        Inventory inventory = book.getInventory();
+    private void withdrawCopy(Inventory inventory) {
         int total = Math.max(0, inventory.getTotalCopies() - 1);
         inventory.setTotalCopies(total);
         inventory.setAvailableCopies(Math.min(inventory.getAvailableCopies(), total));
     }
 
-    private void setStock(Book book, int copies) {
-        book.getInventory().setTotalCopies(copies);
-        book.getInventory().setAvailableCopies(copies);
+    private void setStock(Inventory inventory, int copies) {
+        inventory.setTotalCopies(copies);
+        inventory.setAvailableCopies(copies);
     }
 
-    private void takeCopy(Book book) {
-        Inventory inventory = book.getInventory();
+    private void takeCopy(Inventory inventory) {
         inventory.setAvailableCopies(Math.max(0, inventory.getAvailableCopies() - 1));
     }
 
-    private void audit(String type, User actor, String action, Long whatId) {
+    private void audit(String type, Member actor, String action, Long whatId) {
         auditLogService.logAs(type, actor.getId(), action, whatId);
     }
 
-    private User findUser(String username) {
-        return userRepository.findUserByUsername(username)
-                .orElseThrow(() -> new InformationNotFoundException("User '" + username + "' not found"));
+    private Member findMember(String username) {
+        return memberRepository.findByUsername(username)
+                .orElseThrow(() -> new InformationNotFoundException("Member '" + username + "' not found"));
     }
 
-    private Book findBook(String title) {
-        return bookRepository.findByTitle(title)
+    private Inventory findBook(String title) {
+        return inventoryRepository.findByBookTitle(title)
                 .orElseThrow(() -> new InformationNotFoundException("Book '" + title + "' not found"));
     }
 }
