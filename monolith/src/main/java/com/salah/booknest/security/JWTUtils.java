@@ -55,14 +55,4 @@ public class JWTUtils {
         Claims claims = Jwts.parserBuilder().setSigningKey(jwtSecret).build().parseClaimsJws(token).getBody();
         return RESET_PURPOSE.equals(claims.get(PURPOSE_CLAIM));
     }
-
-    public String generatePasswordResetToken(String username) {
-        return Jwts.builder()
-                .setSubject(username)
-                .claim(PURPOSE_CLAIM, RESET_PURPOSE)
-                .setIssuedAt(new Date())
-                .setExpiration(new Date((new Date()).getTime() + 900000))
-                .signWith(SignatureAlgorithm.HS256, jwtSecret)
-                .compact();
-    }
 }
