@@ -3,25 +3,23 @@ package com.salah.booknest.lending;
 import com.salah.booknest.lending.exception.InformationExistException;
 import com.salah.booknest.lending.exception.InvalidRequestException;
 import com.salah.booknest.lending.exception.InvalidStateException;
-import com.salah.booknest.lending.model.Book;
 import com.salah.booknest.lending.model.Fine;
 import com.salah.booknest.lending.model.FineType;
 import com.salah.booknest.lending.model.Inventory;
 import com.salah.booknest.lending.model.Loan;
 import com.salah.booknest.lending.model.LoanStatus;
 import com.salah.booknest.lending.model.ReturnTiming;
-import com.salah.booknest.lending.model.User;
+import com.salah.booknest.lending.model.Member;
 import com.salah.booknest.lending.model.request.LoanRequest;
 import com.salah.booknest.lending.model.request.ReviewReturnRequest;
 import com.salah.booknest.lending.model.response.LoanResponse;
-import com.salah.booknest.lending.repository.BookRepository;
+import com.salah.booknest.lending.repository.InventoryRepository;
 import com.salah.booknest.lending.repository.FineRepository;
 import com.salah.booknest.lending.repository.LoanRepository;
-import com.salah.booknest.lending.repository.UserRepository;
-import com.salah.booknest.lending.service.AppSharedService;
-import com.salah.booknest.lending.service.AsyncEmailService;
+import com.salah.booknest.lending.security.TokenUser;
 import com.salah.booknest.lending.service.AuditLogService;
 import com.salah.booknest.lending.service.InventoryLocker;
+import com.salah.booknest.lending.service.MemberService;
 import com.salah.booknest.lending.service.LoanService;
 import com.salah.booknest.lending.service.NotificationService;
 import com.salah.booknest.lending.service.WaitlistService;
@@ -66,23 +64,18 @@ import static org.mockito.Mockito.when;
 class BookBorrowTest {
 
     @Mock private LoanRepository loanRepository;
-    @Mock private UserRepository userRepository;
-    @Mock private BookRepository bookRepository;
+    @Mock private InventoryRepository inventoryRepository;
     @Mock private InventoryLocker inventoryLocker;
     @Mock private FineRepository fineRepository;
     @Mock private AuditLogService auditLogService;
     @Mock private NotificationService notificationService;
-    @Mock private AppSharedService appSharedService;
+    @Mock private MemberService memberService;
     @Mock private WaitlistService waitlistService;
-    @Mock private AsyncEmailService asyncEmailService;
 
     @InjectMocks
     private LoanService loanService;
 
-    private User member;
-    private User otherMember;
-    private User librarian;
-    private Book book;
+    private Member member;
     private Inventory inventory;
     private Authentication memberAuth;
     private Authentication otherMemberAuth;
@@ -95,29 +88,21 @@ class BookBorrowTest {
         // the late fine per day normally comes from application.properties
         ReflectionTestUtils.setField(loanService, "latePerDay", new BigDecimal("0.35"));
 
-        member = user(1L, "alice");
-        otherMember = user(2L, "bob");
-        librarian = user(3L, "lib");
-
-        book = new Book();
-        book.setId(10L);
-        book.setTitle("Clean Code");
-        book.setActive(true);
+        member = new Member(1L, "alice");
 
         inventory = new Inventory();
-        inventory.setBook(book);
+        inventory.setBookId(10L);
+        inventory.setBookTitle("Clean Code");
+        inventory.setActive(true);
         inventory.setTotalCopies(3);
         inventory.setAvailableCopies(3);
 
-        memberAuth = auth("alice", false);
-        otherMemberAuth = auth("bob", false);
-        librarianAuth = auth("lib", true);
+        memberAuth = auth(1L, "alice", false);
+        otherMemberAuth = auth(2L, "bob", false);
+        librarianAuth = auth(3L, "lib", true);
 
-        when(appSharedService.getUserFromAuth(memberAuth)).thenReturn(member);
-        when(appSharedService.getUserFromAuthForUpdate(memberAuth)).thenReturn(member);
-        when(appSharedService.getUserFromAuth(otherMemberAuth)).thenReturn(otherMember);
-        when(appSharedService.getUserFromAuth(librarianAuth)).thenReturn(librarian);
-        when(bookRepository.findById(10L)).thenReturn(Optional.of(book));
+        when(memberService.lockCurrentMember(memberAuth)).thenReturn(member);
+        when(inventoryRepository.findByBookId(10L)).thenReturn(Optional.of(inventory));
         when(inventoryLocker.lock(10L)).thenReturn(inventory);
         // nobody is waiting, so a returned copy goes back on the shelf
         doAnswer(call -> {
@@ -197,14 +182,14 @@ class BookBorrowTest {
     void borrow_locksTheMemberBeforeTheBook() {
         loanService.borrow(memberAuth, request(10L, 7));
 
-        InOrder order = inOrder(appSharedService, inventoryLocker);
-        order.verify(appSharedService).getUserFromAuthForUpdate(memberAuth);
+        InOrder order = inOrder(memberService, inventoryLocker);
+        order.verify(memberService).lockCurrentMember(memberAuth);
         order.verify(inventoryLocker).lock(10L);
     }
 
     @Test
     void borrow_inactiveBook_throws() {
-        book.setActive(false);
+        inventory.setActive(false);
 
         assertThrows(InvalidStateException.class, () -> loanService.borrow(memberAuth, request(10L, 7)));
     }
@@ -320,17 +305,10 @@ class BookBorrowTest {
 
     // helpers
 
-    private User user(Long id, String username) {
-        User u = new User();
-        u.setId(id);
-        u.setUsername(username);
-        return u;
-    }
-
-    private Authentication auth(String username, boolean isLibrarian) {
+    private Authentication auth(Long id, String username, boolean isLibrarian) {
         String role = isLibrarian ? "ROLE_librarian" : "ROLE_member";
         return new UsernamePasswordAuthenticationToken(
-                username, null, List.of(new SimpleGrantedAuthority(role)));
+                new TokenUser(id, username), null, List.of(new SimpleGrantedAuthority(role)));
     }
 
     /** LoanRequest only has getters, so it is mocked. */
@@ -344,8 +322,10 @@ class BookBorrowTest {
     private Loan loan(LoanStatus status, int requestedDays) {
         Loan loan = new Loan();
         loan.setId(100L);
-        loan.setUser(member);
-        loan.setBook(book);
+        loan.setUserId(member.getId());
+        loan.setUsername(member.getUsername());
+        loan.setBookId(inventory.getBookId());
+        loan.setBookTitle(inventory.getBookTitle());
         loan.setStatus(status);
         loan.setRequestedDays(requestedDays);
         loan.setLoanDate(LocalDate.now().minusDays(requestedDays));

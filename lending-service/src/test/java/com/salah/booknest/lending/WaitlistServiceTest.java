@@ -2,20 +2,19 @@ package com.salah.booknest.lending;
 
 import com.salah.booknest.lending.exception.InformationExistException;
 import com.salah.booknest.lending.exception.InvalidStateException;
-import com.salah.booknest.lending.model.Book;
 import com.salah.booknest.lending.model.Inventory;
-import com.salah.booknest.lending.model.User;
+import com.salah.booknest.lending.model.Member;
 import com.salah.booknest.lending.model.WaitlistEntry;
 import com.salah.booknest.lending.model.WaitlistStatus;
 import com.salah.booknest.lending.model.request.WaitlistRequest;
 import com.salah.booknest.lending.model.response.WaitlistResponse;
-import com.salah.booknest.lending.repository.BookRepository;
+import com.salah.booknest.lending.repository.InventoryRepository;
 import com.salah.booknest.lending.repository.LoanRepository;
 import com.salah.booknest.lending.repository.WaitlistRepository;
-import com.salah.booknest.lending.service.AppSharedService;
-import com.salah.booknest.lending.service.AsyncEmailService;
+import com.salah.booknest.lending.security.TokenUser;
 import com.salah.booknest.lending.service.AuditLogService;
 import com.salah.booknest.lending.service.InventoryLocker;
+import com.salah.booknest.lending.service.MemberService;
 import com.salah.booknest.lending.service.NotificationService;
 import com.salah.booknest.lending.service.WaitlistService;
 import jakarta.persistence.EntityManager;
@@ -58,21 +57,19 @@ import static org.mockito.Mockito.when;
 class WaitlistServiceTest {
 
     @Mock private WaitlistRepository waitlistRepository;
-    @Mock private BookRepository bookRepository;
+    @Mock private InventoryRepository inventoryRepository;
     @Mock private InventoryLocker inventoryLocker;
     @Mock private LoanRepository loanRepository;
     @Mock private AuditLogService auditLogService;
-    @Mock private AppSharedService appSharedService;
+    @Mock private MemberService memberService;
     @Mock private NotificationService notificationService;
-    @Mock private AsyncEmailService asyncEmailService;
     @Mock private EntityManager entityManager;
 
     @InjectMocks
     private WaitlistService waitlistService;
 
-    private User member;
-    private User otherMember;
-    private Book book;
+    private Member member;
+    private Member otherMember;
     private Inventory inventory;
     private Authentication memberAuth;
     private Authentication otherAuth;
@@ -82,23 +79,20 @@ class WaitlistServiceTest {
         TransactionSynchronizationManager.initSynchronization();
         ReflectionTestUtils.setField(waitlistService, "holdHours", 24);
 
-        member = user(1L, "alice");
-        otherMember = user(2L, "bob");
-
-        book = new Book();
-        book.setId(10L);
-        book.setTitle("Clean Code");
-        book.setActive(true);
+        member = new Member(1L, "alice");
+        otherMember = new Member(2L, "bob");
 
         inventory = new Inventory();
-        inventory.setBook(book);
+        inventory.setBookId(10L);
+        inventory.setBookTitle("Clean Code");
+        inventory.setActive(true);
         inventory.setTotalCopies(1);
         inventory.setAvailableCopies(0);
 
-        memberAuth = auth("alice");
-        otherAuth = auth("bob");
-        when(appSharedService.getUserFromAuthForUpdate(memberAuth)).thenReturn(member);
-        when(bookRepository.findById(10L)).thenReturn(Optional.of(book));
+        memberAuth = auth(member);
+        otherAuth = auth(otherMember);
+        when(memberService.lockCurrentMember(memberAuth)).thenReturn(member);
+        when(inventoryRepository.findByBookId(10L)).thenReturn(Optional.of(inventory));
         when(inventoryLocker.lock(10L)).thenReturn(inventory);
         when(waitlistRepository.save(any(WaitlistEntry.class))).thenAnswer(call -> {
             WaitlistEntry e = call.getArgument(0);
@@ -168,8 +162,8 @@ class WaitlistServiceTest {
     void join_locksTheMemberBeforeTheBook() {
         waitlistService.join(memberAuth, new WaitlistRequest(10L));
 
-        InOrder order = inOrder(appSharedService, inventoryLocker);
-        order.verify(appSharedService).getUserFromAuthForUpdate(memberAuth);
+        InOrder order = inOrder(memberService, inventoryLocker);
+        order.verify(memberService).lockCurrentMember(memberAuth);
         order.verify(inventoryLocker).lock(10L);
     }
 
@@ -282,23 +276,17 @@ class WaitlistServiceTest {
 
     // helpers
 
-    private User user(Long id, String username) {
-        User u = new User();
-        u.setId(id);
-        u.setUsername(username);
-        u.setEmailAddress(username + "@test.com");
-        return u;
+    private Authentication auth(Member member) {
+        return new UsernamePasswordAuthenticationToken(new TokenUser(member.getId(), member.getUsername()), null, List.of());
     }
 
-    private Authentication auth(String username) {
-        return new UsernamePasswordAuthenticationToken(username, null, List.of());
-    }
-
-    private WaitlistEntry entry(Long id, User user, WaitlistStatus status) {
+    private WaitlistEntry entry(Long id, Member user, WaitlistStatus status) {
         WaitlistEntry e = new WaitlistEntry();
         e.setId(id);
-        e.setUser(user);
-        e.setBook(book);
+        e.setUserId(user.getId());
+        e.setUsername(user.getUsername());
+        e.setBookId(10L);
+        e.setBookTitle("Clean Code");
         e.setStatus(status);
         return e;
     }

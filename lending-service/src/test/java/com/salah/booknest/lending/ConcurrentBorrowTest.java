@@ -1,10 +1,10 @@
 package com.salah.booknest.lending;
 
 import com.salah.booknest.lending.exception.InformationExistException;
-import com.salah.booknest.lending.model.Book;
+import com.salah.booknest.lending.support.TestBook;
 import com.salah.booknest.lending.model.Loan;
 import com.salah.booknest.lending.model.LoanStatus;
-import com.salah.booknest.lending.model.User;
+import com.salah.booknest.lending.support.TestUser;
 import com.salah.booknest.lending.model.request.LoanRequest;
 import com.salah.booknest.lending.service.LoanService;
 import com.salah.booknest.lending.support.ConcurrentRunner;
@@ -31,11 +31,11 @@ class ConcurrentBorrowTest {
 
     @RepeatedTest(5)
     void lastCopy_tenMembersBorrowTogether_onlyOneGetsIt() throws Exception {
-        Book book = data.newBook(1);
+        TestBook book = data.newBook(1);
         List<Callable<Object>> tasks = new ArrayList<>();
         for (int i = 0; i < 10; i++) {
-            User member = data.newUser();
-            tasks.add(() -> loanService.borrow(data.auth(member), new LoanRequest(book.getId(), 7)));
+            TestUser member = data.newUser();
+            tasks.add(() -> loanService.borrow(data.auth(member), new LoanRequest(book.id(), 7)));
         }
 
         List<Outcome> outcomes = ConcurrentRunner.runTogether(tasks);
@@ -49,11 +49,11 @@ class ConcurrentBorrowTest {
 
     @Test
     void threeCopies_tenMembersBorrowTogether_exactlyThreeGetOne() throws Exception {
-        Book book = data.newBook(3);
+        TestBook book = data.newBook(3);
         List<Callable<Object>> tasks = new ArrayList<>();
         for (int i = 0; i < 10; i++) {
-            User member = data.newUser();
-            tasks.add(() -> loanService.borrow(data.auth(member), new LoanRequest(book.getId(), 7)));
+            TestUser member = data.newUser();
+            tasks.add(() -> loanService.borrow(data.auth(member), new LoanRequest(book.id(), 7)));
         }
 
         List<Outcome> outcomes = ConcurrentRunner.runTogether(tasks);
@@ -66,11 +66,11 @@ class ConcurrentBorrowTest {
 
     @Test
     void sameMemberBorrowsTheSameBookTwiceAtOnce_onlyOneLoanIsCreated() throws Exception {
-        Book book = data.newBook(5);
-        User member = data.newUser();
+        TestBook book = data.newBook(5);
+        TestUser member = data.newUser();
         List<Callable<Object>> tasks = new ArrayList<>();
         for (int i = 0; i < 5; i++) {
-            tasks.add(() -> loanService.borrow(data.auth(member), new LoanRequest(book.getId(), 7)));
+            tasks.add(() -> loanService.borrow(data.auth(member), new LoanRequest(book.id(), 7)));
         }
 
         List<Outcome> outcomes = ConcurrentRunner.runTogether(tasks);
@@ -84,31 +84,31 @@ class ConcurrentBorrowTest {
 
     @Test
     void memberWithFourLoansBorrowsFourMoreAtOnce_loanLimitHolds() throws Exception {
-        User member = data.newUser();
+        TestUser member = data.newUser();
         for (int i = 0; i < 4; i++) {
             data.newLoan(member, data.newBook(2));
         }
-        List<Book> books = new ArrayList<>();
+        List<TestBook> books = new ArrayList<>();
         List<Callable<Object>> tasks = new ArrayList<>();
         for (int i = 0; i < 4; i++) {
-            Book book = data.newBook(2);
+            TestBook book = data.newBook(2);
             books.add(book);
-            tasks.add(() -> loanService.borrow(data.auth(member), new LoanRequest(book.getId(), 7)));
+            tasks.add(() -> loanService.borrow(data.auth(member), new LoanRequest(book.id(), 7)));
         }
 
         List<Outcome> outcomes = ConcurrentRunner.runTogether(tasks);
 
         assertEquals(1, ConcurrentRunner.countSucceeded(outcomes));
         assertEquals(3, ConcurrentRunner.countErrorCode(outcomes, "LOAN_LIMIT_REACHED"));
-        for (Book book : books) {
+        for (TestBook book : books) {
             data.assertStockConsistent(book);
         }
     }
 
     @Test
     void returnAndCancelAtOnce_onlyOneOfThemWins() throws Exception {
-        Book book = data.newBook(1);
-        User member = data.newUser();
+        TestBook book = data.newBook(1);
+        TestUser member = data.newUser();
         Loan loan = data.newLoan(member, book);
 
         List<Callable<Object>> tasks = List.of(

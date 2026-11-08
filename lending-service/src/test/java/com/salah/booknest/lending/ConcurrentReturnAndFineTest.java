@@ -1,10 +1,10 @@
 package com.salah.booknest.lending;
 
-import com.salah.booknest.lending.model.Book;
+import com.salah.booknest.lending.support.TestBook;
 import com.salah.booknest.lending.model.Fine;
 import com.salah.booknest.lending.model.FineStatus;
 import com.salah.booknest.lending.model.Loan;
-import com.salah.booknest.lending.model.User;
+import com.salah.booknest.lending.support.TestUser;
 import com.salah.booknest.lending.model.request.ReviewReturnRequest;
 import com.salah.booknest.lending.repository.FineRepository;
 import com.salah.booknest.lending.service.FineService;
@@ -34,7 +34,7 @@ class ConcurrentReturnAndFineTest {
 
     @Test
     void sameFinePaidFiveTimesAtOnce_onlyOnePaymentGoesThrough() throws Exception {
-        User member = data.newUser();
+        TestUser member = data.newUser();
         Loan loan = data.newLoan(member, data.newBook(1));
         Fine fine = data.newFine(loan);
         List<Callable<Object>> tasks = new ArrayList<>();
@@ -51,10 +51,10 @@ class ConcurrentReturnAndFineTest {
 
     @Test
     void twoLibrariansReviewTheSameReturn_copyGoesBackOnlyOnce() throws Exception {
-        Book book = data.newBook(1);
-        User member = data.newUser();
-        User librarianOne = data.newLibrarian();
-        User librarianTwo = data.newLibrarian();
+        TestBook book = data.newBook(1);
+        TestUser member = data.newUser();
+        TestUser librarianOne = data.newLibrarian();
+        TestUser librarianTwo = data.newLibrarian();
         Loan loan = data.newLoan(member, book);
         loanService.returnLoan(loan.getId(), data.auth(member));
 
@@ -73,8 +73,8 @@ class ConcurrentReturnAndFineTest {
 
     @Test
     void memberReturnsTheSameLoanTwiceAtOnce_onlyOneReturnCounts() throws Exception {
-        Book book = data.newBook(1);
-        User member = data.newUser();
+        TestBook book = data.newBook(1);
+        TestUser member = data.newUser();
         Loan loan = data.newLoan(member, book);
         List<Callable<Object>> tasks = new ArrayList<>();
         for (int i = 0; i < 4; i++) {

@@ -1,14 +1,13 @@
 package com.salah.booknest.lending;
 
 import com.salah.booknest.lending.job.HoldExpiryJob;
-import com.salah.booknest.lending.model.Book;
+import com.salah.booknest.lending.support.TestBook;
 import com.salah.booknest.lending.model.WaitlistEntry;
 import com.salah.booknest.lending.model.WaitlistStatus;
 import com.salah.booknest.lending.support.TestData;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.util.ArrayList;
@@ -21,15 +20,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class HoldExpiryJobTest {
 
     @Autowired private HoldExpiryJob holdExpiryJob;
-    @Autowired private ThreadPoolTaskExecutor notificationExecutor;
     @Autowired private TestData data;
 
     @Test
     void sixExpiredHolds_jobExpiresAllOfThemAndPutsTheCopiesBack() {
-        List<Book> books = new ArrayList<>();
+        List<TestBook> books = new ArrayList<>();
         List<WaitlistEntry> entries = new ArrayList<>();
         for (int i = 0; i < 6; i++) {
-            Book book = data.newBook(1);
+            TestBook book = data.newBook(1);
             data.setAvailable(book, 0);
             books.add(book);
             entries.add(data.newHoldEntry(data.newUser(), book, -10));
@@ -46,7 +44,7 @@ class HoldExpiryJobTest {
 
     @Test
     void holdThatIsNotOverYet_isLeftAlone() {
-        Book book = data.newBook(1);
+        TestBook book = data.newBook(1);
         data.setAvailable(book, 0);
         WaitlistEntry entry = data.newHoldEntry(data.newUser(), book, 60);
 
@@ -54,11 +52,5 @@ class HoldExpiryJobTest {
 
         assertEquals(WaitlistStatus.HOLD_READY, data.reload(entry).getStatus());
         assertEquals(0, data.inventory(book).getAvailableCopies());
-    }
-
-    @Test
-    void notificationPoolIsConfiguredAsPlanned() {
-        assertEquals(4, notificationExecutor.getCorePoolSize());
-        assertEquals(8, notificationExecutor.getMaxPoolSize());
     }
 }

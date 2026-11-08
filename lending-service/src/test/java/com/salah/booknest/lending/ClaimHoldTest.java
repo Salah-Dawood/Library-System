@@ -2,22 +2,20 @@ package com.salah.booknest.lending;
 
 import com.salah.booknest.lending.exception.InvalidRequestException;
 import com.salah.booknest.lending.exception.InvalidStateException;
-import com.salah.booknest.lending.model.Book;
 import com.salah.booknest.lending.model.Loan;
 import com.salah.booknest.lending.model.LoanStatus;
-import com.salah.booknest.lending.model.User;
+import com.salah.booknest.lending.model.Member;
 import com.salah.booknest.lending.model.WaitlistEntry;
 import com.salah.booknest.lending.model.WaitlistStatus;
 import com.salah.booknest.lending.model.response.LoanResponse;
-import com.salah.booknest.lending.repository.BookRepository;
+import com.salah.booknest.lending.repository.InventoryRepository;
 import com.salah.booknest.lending.repository.FineRepository;
 import com.salah.booknest.lending.repository.LoanRepository;
-import com.salah.booknest.lending.repository.UserRepository;
-import com.salah.booknest.lending.service.AppSharedService;
-import com.salah.booknest.lending.service.AsyncEmailService;
+import com.salah.booknest.lending.security.TokenUser;
 import com.salah.booknest.lending.service.AuditLogService;
 import com.salah.booknest.lending.service.InventoryLocker;
 import com.salah.booknest.lending.service.LoanService;
+import com.salah.booknest.lending.service.MemberService;
 import com.salah.booknest.lending.service.NotificationService;
 import com.salah.booknest.lending.service.WaitlistService;
 import org.junit.jupiter.api.AfterEach;
@@ -52,21 +50,18 @@ import static org.mockito.Mockito.when;
 class ClaimHoldTest {
 
     @Mock private LoanRepository loanRepository;
-    @Mock private UserRepository userRepository;
-    @Mock private BookRepository bookRepository;
+    @Mock private InventoryRepository inventoryRepository;
     @Mock private InventoryLocker inventoryLocker;
     @Mock private FineRepository fineRepository;
     @Mock private AuditLogService auditLogService;
     @Mock private NotificationService notificationService;
-    @Mock private AppSharedService appSharedService;
+    @Mock private MemberService memberService;
     @Mock private WaitlistService waitlistService;
-    @Mock private AsyncEmailService asyncEmailService;
 
     @InjectMocks
     private LoanService loanService;
 
-    private User member;
-    private Book book;
+    private Member member;
     private WaitlistEntry hold;
     private Authentication memberAuth;
 
@@ -74,23 +69,19 @@ class ClaimHoldTest {
     void setUp() {
         TransactionSynchronizationManager.initSynchronization();
 
-        member = new User();
-        member.setId(1L);
-        member.setUsername("alice");
-
-        book = new Book();
-        book.setId(10L);
-        book.setTitle("Clean Code");
+        member = new Member(1L, "alice");
 
         hold = new WaitlistEntry();
         hold.setId(50L);
-        hold.setUser(member);
-        hold.setBook(book);
+        hold.setUserId(1L);
+        hold.setUsername("alice");
+        hold.setBookId(10L);
+        hold.setBookTitle("Clean Code");
         hold.setStatus(WaitlistStatus.HOLD_READY);
         hold.setHoldExpiresAt(LocalDateTime.now().plusHours(5));
 
-        memberAuth = new UsernamePasswordAuthenticationToken("alice", null, List.of());
-        when(appSharedService.getUserFromAuthForUpdate(memberAuth)).thenReturn(member);
+        memberAuth = new UsernamePasswordAuthenticationToken(new TokenUser(1L, "alice"), null, List.of());
+        when(memberService.lockCurrentMember(memberAuth)).thenReturn(member);
         when(waitlistService.getEntryLocked(50L)).thenReturn(hold);
         when(loanRepository.countByUserIdAndStatusIn(any(), anyCollection())).thenReturn(0L);
         when(loanRepository.save(any(Loan.class))).thenAnswer(call -> {
@@ -118,8 +109,8 @@ class ClaimHoldTest {
     void claimHold_locksTheMemberBeforeTheBook() {
         loanService.claimHold(50L, 7, memberAuth);
 
-        InOrder order = inOrder(appSharedService, waitlistService);
-        order.verify(appSharedService).getUserFromAuthForUpdate(memberAuth);
+        InOrder order = inOrder(memberService, waitlistService);
+        order.verify(memberService).lockCurrentMember(memberAuth);
         order.verify(waitlistService).getEntryLocked(50L);
     }
 
@@ -153,8 +144,8 @@ class ClaimHoldTest {
 
     @Test
     void claimHold_holdOfAnotherMember_throwsAccessDenied() {
-        Authentication other = new UsernamePasswordAuthenticationToken("bob", null, List.of());
-        when(appSharedService.getUserFromAuthForUpdate(other)).thenReturn(new User());
+        Authentication other = new UsernamePasswordAuthenticationToken(new TokenUser(2L, "bob"), null, List.of());
+        when(memberService.lockCurrentMember(other)).thenReturn(new Member(2L, "bob"));
 
         assertThrows(AccessDeniedException.class, () -> loanService.claimHold(50L, 7, other));
         assertEquals(WaitlistStatus.HOLD_READY, hold.getStatus());

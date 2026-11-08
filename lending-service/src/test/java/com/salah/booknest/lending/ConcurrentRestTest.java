@@ -1,11 +1,9 @@
 package com.salah.booknest.lending;
 
-import com.salah.booknest.lending.model.Book;
+import com.salah.booknest.lending.support.TestBook;
 import com.salah.booknest.lending.model.Fine;
 import com.salah.booknest.lending.model.Loan;
-import com.salah.booknest.lending.model.User;
-import com.salah.booknest.lending.security.JWTUtils;
-import com.salah.booknest.lending.security.MyUserDetails;
+import com.salah.booknest.lending.support.TestUser;
 import com.salah.booknest.lending.support.ConcurrentRunner;
 import com.salah.booknest.lending.support.ConcurrentRunner.Outcome;
 import com.salah.booknest.lending.support.TestData;
@@ -33,7 +31,6 @@ class ConcurrentRestTest {
     @Value("${local.server.port}")
     private int port;
 
-    @Autowired private JWTUtils jwtUtils;
     @Autowired private TestData data;
 
     private final HttpClient client = HttpClient.newHttpClient();
@@ -41,8 +38,8 @@ class ConcurrentRestTest {
     private record Reply(int status, String body) {
     }
 
-    private String token(User user) {
-        return jwtUtils.generateJwtToken(new MyUserDetails(user));
+    private String token(TestUser user) {
+        return data.token(user);
     }
 
     private Reply send(String method, String path, String token, String json) throws Exception {
@@ -71,8 +68,8 @@ class ConcurrentRestTest {
 
     @Test
     void tenRequestsForTheLastCopy_oneGets201AndNineGet409() throws Exception {
-        Book book = data.newBook(1);
-        String json = "{\"bookId\":" + book.getId() + ",\"duration\":7}";
+        TestBook book = data.newBook(1);
+        String json = "{\"bookId\":" + book.id() + ",\"duration\":7}";
         List<Callable<Object>> tasks = new ArrayList<>();
         for (int i = 0; i < 10; i++) {
             String token = token(data.newUser());
@@ -90,7 +87,7 @@ class ConcurrentRestTest {
 
     @Test
     void fiveRequestsToPayTheSameFine_oneGets200AndFourGet409() throws Exception {
-        User member = data.newUser();
+        TestUser member = data.newUser();
         Loan loan = data.newLoan(member, data.newBook(1));
         Fine fine = data.newFine(loan);
         String token = token(member);
@@ -108,9 +105,9 @@ class ConcurrentRestTest {
 
     @Test
     void requestWithoutToken_isRejectedWith401() throws Exception {
-        Book book = data.newBook(1);
+        TestBook book = data.newBook(1);
 
-        Reply reply = send("POST", "/api/loans", null, "{\"bookId\":" + book.getId() + ",\"duration\":7}");
+        Reply reply = send("POST", "/api/loans", null, "{\"bookId\":" + book.id() + ",\"duration\":7}");
 
         assertEquals(401, reply.status());
         assertEquals(1, data.inventory(book).getAvailableCopies());
@@ -118,10 +115,10 @@ class ConcurrentRestTest {
 
     @Test
     void invalidDuration_isRejectedWith400AndTakesNoCopy() throws Exception {
-        Book book = data.newBook(1);
+        TestBook book = data.newBook(1);
         String token = token(data.newUser());
 
-        Reply reply = send("POST", "/api/loans", token, "{\"bookId\":" + book.getId() + ",\"duration\":99}");
+        Reply reply = send("POST", "/api/loans", token, "{\"bookId\":" + book.id() + ",\"duration\":99}");
 
         assertEquals(400, reply.status());
         assertEquals(1, data.inventory(book).getAvailableCopies());

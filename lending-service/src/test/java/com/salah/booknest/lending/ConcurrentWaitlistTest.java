@@ -1,9 +1,9 @@
 package com.salah.booknest.lending;
 
 import com.salah.booknest.lending.exception.InformationExistException;
-import com.salah.booknest.lending.model.Book;
+import com.salah.booknest.lending.support.TestBook;
 import com.salah.booknest.lending.model.Loan;
-import com.salah.booknest.lending.model.User;
+import com.salah.booknest.lending.support.TestUser;
 import com.salah.booknest.lending.model.WaitlistEntry;
 import com.salah.booknest.lending.model.WaitlistStatus;
 import com.salah.booknest.lending.model.request.LoanRequest;
@@ -39,12 +39,12 @@ class ConcurrentWaitlistTest {
 
     @Test
     void eightMembersJoinAtOnce_everyoneGetsTheirOwnPosition() throws Exception {
-        Book book = data.newBook(1);
+        TestBook book = data.newBook(1);
         data.newLoan(data.newUser(), book);
         List<Callable<Object>> tasks = new ArrayList<>();
         for (int i = 0; i < 8; i++) {
-            User member = data.newUser();
-            tasks.add(() -> waitlistService.join(data.auth(member), new WaitlistRequest(book.getId())));
+            TestUser member = data.newUser();
+            tasks.add(() -> waitlistService.join(data.auth(member), new WaitlistRequest(book.id())));
         }
 
         List<Outcome> outcomes = ConcurrentRunner.runTogether(tasks);
@@ -60,12 +60,12 @@ class ConcurrentWaitlistTest {
 
     @Test
     void sameMemberJoinsFiveTimesAtOnce_onlyOneEntryIsCreated() throws Exception {
-        Book book = data.newBook(1);
+        TestBook book = data.newBook(1);
         data.newLoan(data.newUser(), book);
-        User member = data.newUser();
+        TestUser member = data.newUser();
         List<Callable<Object>> tasks = new ArrayList<>();
         for (int i = 0; i < 5; i++) {
-            tasks.add(() -> waitlistService.join(data.auth(member), new WaitlistRequest(book.getId())));
+            tasks.add(() -> waitlistService.join(data.auth(member), new WaitlistRequest(book.id())));
         }
 
         List<Outcome> outcomes = ConcurrentRunner.runTogether(tasks);
@@ -77,10 +77,10 @@ class ConcurrentWaitlistTest {
 
     @Test
     void returnedCopyIsHeldForTheFirstInLine_walkInsCannotTakeIt() throws Exception {
-        Book book = data.newBook(1);
-        User borrower = data.newUser();
-        User librarian = data.newLibrarian();
-        User firstInLine = data.newUser();
+        TestBook book = data.newBook(1);
+        TestUser borrower = data.newUser();
+        TestUser librarian = data.newLibrarian();
+        TestUser firstInLine = data.newUser();
         Loan loan = data.newLoan(borrower, book);
         WaitlistEntry entry = data.newWaitingEntry(firstInLine, book);
 
@@ -91,8 +91,8 @@ class ConcurrentWaitlistTest {
 
         List<Callable<Object>> tasks = new ArrayList<>();
         for (int i = 0; i < 5; i++) {
-            User walkIn = data.newUser();
-            tasks.add(() -> loanService.borrow(data.auth(walkIn), new LoanRequest(book.getId(), 7)));
+            TestUser walkIn = data.newUser();
+            tasks.add(() -> loanService.borrow(data.auth(walkIn), new LoanRequest(book.id(), 7)));
         }
         tasks.add(() -> loanService.claimHold(entry.getId(), 7, data.auth(firstInLine)));
 
@@ -107,8 +107,8 @@ class ConcurrentWaitlistTest {
 
     @Test
     void sameHoldClaimedFiveTimesAtOnce_onlyOneLoanIsCreated() throws Exception {
-        Book book = data.newBook(1);
-        User member = data.newUser();
+        TestBook book = data.newBook(1);
+        TestUser member = data.newUser();
         WaitlistEntry entry = data.newHoldEntry(member, book, 60);
         data.setAvailable(book, 0);
         List<Callable<Object>> tasks = new ArrayList<>();
@@ -125,8 +125,8 @@ class ConcurrentWaitlistTest {
 
     @Test
     void sameHoldExpiredFiveTimesAtOnce_copyIsOfferedOnlyOnce() throws Exception {
-        Book book = data.newBook(1);
-        User member = data.newUser();
+        TestBook book = data.newBook(1);
+        TestUser member = data.newUser();
         WaitlistEntry entry = data.newHoldEntry(member, book, -5);
         data.setAvailable(book, 0);
         List<Callable<Object>> tasks = new ArrayList<>();
@@ -145,8 +145,8 @@ class ConcurrentWaitlistTest {
 
     @Test
     void holdLeftByMemberAndExpiredAtOnce_copyIsOfferedOnlyOnce() throws Exception {
-        Book book = data.newBook(1);
-        User member = data.newUser();
+        TestBook book = data.newBook(1);
+        TestUser member = data.newUser();
         WaitlistEntry entry = data.newHoldEntry(member, book, -5);
         data.setAvailable(book, 0);
 
