@@ -16,7 +16,6 @@
 	<description>BookNest microservices</description>
 
 	<modules>
-		<module>monolith</module>
 		<module>api-gateway</module>
 		<module>user-service</module>
 		<module>catalog-service</module>
