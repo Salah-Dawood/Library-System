@@ -24,9 +24,12 @@ public class JWTUtils {
     private int jwtExpirationMs;
 
 
+    // other services have no users table, so they read the id and role from the token
     public String generateJwtToken(MyUserDetails myUserDetails){
         return Jwts.builder()
                 .setSubject(myUserDetails.getUsername())
+                .claim("userId", myUserDetails.getUser().getId())
+                .claim("role", myUserDetails.getUser().getRole().toLowerCase())
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(new Date().getTime() + jwtExpirationMs))
                 .signWith(SignatureAlgorithm.HS256,jwtSecret)
