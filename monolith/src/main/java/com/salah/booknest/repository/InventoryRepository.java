@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 public interface InventoryRepository extends JpaRepository<Inventory, Long> {
@@ -17,4 +19,6 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
     Optional<Inventory> findByBookIdForUpdate(@Param("bookId") Long bookId);
 
     Optional<Inventory> findByBookId(Long bookId);
+
+    List<Inventory> findAllByBookIdIn(Collection<Long> bookIds);
 }

@@ -116,7 +116,7 @@ public class SampleActivitySeeder implements CommandLineRunner {
         returnedPendingReview(alex, fellowship, 7, 8, 0);
         cancelledByLibrarian(librarian, alex, noneLeft, 7, 3);
 
-        // Reviews. Only members who returned a book can review it (see ReviewService), so every review
+        // Reviews. Only members who returned a book can review it (a catalog-service rule), so every review
         // below matches a returned loan above. johnd returned "Dune" but has not reviewed it yet, so
         // the "write a review" step can still be shown live.
         review(john, nineteen84, 9, "Chilling and still painfully relevant. Hard to put down.");
@@ -231,6 +231,7 @@ public class SampleActivitySeeder implements CommandLineRunner {
     private void review(User member, Book book, int rating, String comment) {
         Review review = new Review();
         review.setUser(member);
+        review.setUsername(member.getUsername());
         review.setBook(book);
         review.setRating(rating);
         review.setComment(comment);
