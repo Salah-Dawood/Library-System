@@ -313,6 +313,13 @@ public class LoanService {
         return getStats((appSharedService.getUserFromAuth(authentication)).getId());
     }
 
+    /** True if the logged-in member has a returned and cleared loan of this book (needed to review it). */
+    @Transactional(readOnly = true)
+    public boolean hasReturned(Authentication authentication, Long bookId) {
+        Long userId = appSharedService.getUserFromAuth(authentication).getId();
+        return loanRepository.existsByUserIdAndBookIdAndStatusIn(userId, bookId, List.of(LoanStatus.RETURNED));
+    }
+
     //count return status
     /**
      * Summarises how a user returns books: counts of early, on-time and late returns and the

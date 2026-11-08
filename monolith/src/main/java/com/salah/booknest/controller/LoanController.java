@@ -95,6 +95,12 @@ public class LoanController {
         return loanService.getMyStats(authentication);
     }
 
+    @Operation(summary = "Have I returned this book?", description = "True if the logged-in member returned the book and the librarian cleared it. Used to allow reviews.")
+    @GetMapping("/returned/{bookId}")
+    public boolean hasReturned(Authentication authentication, @Parameter(description = "Id of the book") @PathVariable Long bookId) {
+        return loanService.hasReturned(authentication, bookId);
+    }
+
     @Operation(summary = "A user's return history", description = "Same figures as /my-stats, for any user. Librarian only.")
     @GetMapping("/user/{userId}/stats")
     @PreAuthorize("hasRole('librarian')")

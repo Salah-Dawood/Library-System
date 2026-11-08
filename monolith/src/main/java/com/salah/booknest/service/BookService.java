@@ -3,18 +3,15 @@ package com.salah.booknest.service;
 import com.salah.booknest.exception.InformationExistException;
 import com.salah.booknest.exception.InformationNotFoundException;
 import com.salah.booknest.exception.InvalidRequestException;
-import com.salah.booknest.exception.InvalidStateException;
 import com.salah.booknest.model.Author;
 import com.salah.booknest.model.Book;
 import com.salah.booknest.model.Genre;
 import com.salah.booknest.model.Inventory;
-import com.salah.booknest.model.LoanStatus;
 import com.salah.booknest.model.request.CreateBookRequest;
 import com.salah.booknest.model.response.BookResponse;
 import com.salah.booknest.repository.AuthorRepository;
 import com.salah.booknest.repository.BookRepository;
 import com.salah.booknest.repository.GenreRepository;
-import com.salah.booknest.repository.LoanRepository;
 import com.salah.booknest.repository.ReviewRepository;
 import com.salah.booknest.util.PageUtils;
 import jakarta.persistence.criteria.Join;
@@ -33,28 +30,22 @@ public class BookService {
     private final BookRepository bookRepository;
     private final GenreRepository genreRepository;
     private final AuthorRepository authorRepository;
-    private final InventoryLocker inventoryLocker;
     private final ReviewRepository reviewRepository;
-    private final LoanRepository loanRepository;
     private final AuditLogService auditLogService;
-    private final WaitlistService waitlistService;
+    private final InventoryService inventoryService;
 
     public BookService(BookRepository bookRepository,
                        GenreRepository genreRepository,
                        AuthorRepository authorRepository,
-                       InventoryLocker inventoryLocker,
                        ReviewRepository reviewRepository,
-                       LoanRepository loanRepository,
                        AuditLogService auditLogService,
-                       WaitlistService waitlistService) {
+                       InventoryService inventoryService) {
         this.bookRepository = bookRepository;
         this.genreRepository = genreRepository;
         this.authorRepository = authorRepository;
-        this.inventoryLocker = inventoryLocker;
         this.reviewRepository = reviewRepository;
-        this.loanRepository = loanRepository;
         this.auditLogService = auditLogService;
-        this.waitlistService = waitlistService;
+        this.inventoryService = inventoryService;
     }
 
     /**
@@ -185,7 +176,7 @@ public class BookService {
 
     /**
      * Partial update: only the fields that are not null in the request are changed.
-     * A new genre list replaces the old one, and a new total copies value adjusts stock (see updateTotalCopies).
+     * A new genre list replaces the old one, and a new total copies value adjusts stock (see InventoryService.changeTotalCopies).
      *
      * @throws InformationExistException if the ISBN already belongs to another book
      */
@@ -221,7 +212,7 @@ public class BookService {
             book.setGenres(genres);
         }
         if (request.getTotalCopies() != null) {
-            updateTotalCopies(bookId, request.getTotalCopies());
+            inventoryService.changeTotalCopies(bookId, request.getTotalCopies());
         }
         Book saved = bookRepository.save(book);
         auditLogService.log("BOOK", "UPDATED", saved.getId());
@@ -241,47 +232,13 @@ public class BookService {
             return;
         }
 
-        boolean hasActiveLoans = loanRepository.existsByBookIdAndStatusIn(
-                bookId, List.of(LoanStatus.BORROWED, LoanStatus.PENDING_REVIEW));
-        if (hasActiveLoans) {
-            throw new InvalidStateException("Book is on loan or has returns waiting for review and cannot be removed");
-        }
-
+        inventoryService.retire(bookId);
         book.setActive(false);
-        waitlistService.cancelAllForBook(bookId);
         auditLogService.log("BOOK", "DEACTIVATED", bookId);
         log.info("Book {} deactivated", bookId);
     }
 
 
-    /**
-     * Changes the total number of copies while keeping the copies currently on loan unchanged:
-     * available copies become the new total minus the copies on loan. Every new copy is offered to the
-     * waitlist first, so people in line are not skipped.
-     *
-     * @throws InvalidRequestException if the new total is lower than the number of copies on loan
-     */
-    private void updateTotalCopies(Long bookId, int newTotal) {
-        Inventory inventory = inventoryLocker.lock(bookId);
-        int oldTotal = inventory.getTotalCopies();
-        int oldAvailable = inventory.getAvailableCopies();
-        int onLoan = oldTotal - oldAvailable;
-        if (newTotal < onLoan) {
-            throw new InvalidRequestException(
-                    "Total copies cannot be lower than the " + onLoan + " copies currently on loan");
-        }
-        inventory.setTotalCopies(newTotal);
-        if (newTotal > oldTotal) {
-            inventory.setAvailableCopies(oldAvailable);
-            for (int i = oldTotal; i < newTotal; i++) {
-                waitlistService.offerCopy(inventory);
-            }
-        } else {
-            inventory.setAvailableCopies(newTotal - onLoan);
-        }
-        log.info("Stock of book {} changed: total {} -> {}, available {} -> {}",
-                bookId, oldTotal, newTotal, oldAvailable, inventory.getAvailableCopies());
-    }
 
     //helper methods
 
