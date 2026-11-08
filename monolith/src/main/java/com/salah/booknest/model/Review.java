@@ -28,6 +28,10 @@ public class Review {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
+    // copy of the username, read by catalog-service
+    @Column
+    private String username;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "book_id", nullable = false)
     private Book book;

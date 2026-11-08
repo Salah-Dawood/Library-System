@@ -1,0 +1,96 @@
+package com.salah.booknest.catalog.controller;
+
+import com.salah.booknest.catalog.model.request.AuthorRequest;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import com.salah.booknest.catalog.model.response.AuthorResponse;
+import com.salah.booknest.catalog.service.AuthorService;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@Tag(name = "Authors", description = "Browse authors. Librarians create, edit and delete them.")
+@RestController
+@RequestMapping("/api/authors")
+public class AuthorController {
+    private final AuthorService authorService;
+
+    public AuthorController(AuthorService authorService) {
+        this.authorService = authorService;
+    }
+
+    @Operation(summary = "List authors", description = "List of authors. Each response contains author details without nested JPA entities.")
+    @GetMapping("")
+    public List<AuthorResponse> getAuthors(){
+        return authorService.getAuthors();
+    }
+
+    @Operation(summary = "Get an author by id", description = "Author details without nested JPA entities.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "404", description = "No author with this id")
+    })
+    @GetMapping("{authorId}")
+    public AuthorResponse getAuthorById(@Parameter(description = "Id of the author") @PathVariable Long authorId){
+        return authorService.getAuthorById(authorId);
+    }
+
+    @Operation(summary = "Find an author by name", description = "Exact name match.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "404", description = "No author with this name")
+    })
+    @GetMapping("/search/{name}")
+    public AuthorResponse getAuthorByName(@Parameter(description = "Exact name (case-sensitive)") @PathVariable String name){
+        return authorService.getAuthorByName(name);
+    }
+
+    @Operation(summary = "Create an author", description = "Author names must be unique. Librarian only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Author created", content = @Content(schema = @Schema(implementation = AuthorResponse.class))),
+            @ApiResponse(responseCode = "409", description = "An author with this name already exists")
+    })
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(content = @Content(mediaType = "application/json",
+            examples = @ExampleObject(value = "{\"name\":\"Frank Herbert\",\"birthYear\":1920,\"nationality\":\"American\"}")))
+    @PostMapping("")
+    @PreAuthorize("hasRole('librarian')")
+    public ResponseEntity<AuthorResponse> createAuthor(@Valid @RequestBody AuthorRequest request){
+        return new ResponseEntity<>(authorService.createAuthor(request), HttpStatus.CREATED);
+    }
+
+    @Operation(summary = "Edit an author", description = "Only the fields you send are changed. An author can keep their own name. Librarian only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Author updated", content = @Content(schema = @Schema(implementation = AuthorResponse.class))),
+            @ApiResponse(responseCode = "404", description = "No author with this id"),
+            @ApiResponse(responseCode = "409", description = "Another author already has this name")
+    })
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(content = @Content(mediaType = "application/json",
+            examples = @ExampleObject(value = "{\"name\":\"Frank Herbert\",\"birthYear\":1920,\"nationality\":\"American\"}")))
+    @PutMapping("/{authorId}")
+    @PreAuthorize("hasRole('librarian')")
+    public ResponseEntity<AuthorResponse> updateAuthor(@Parameter(description = "Id of the author") @PathVariable Long authorId,
+                                                       @Valid @RequestBody AuthorRequest request){
+        return new ResponseEntity<>(authorService.updateAuthor(authorId,request), HttpStatus.OK);
+    }
+
+    @Operation(summary = "Delete an author", description = "Deactivates the author while preserving related records. Librarian only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Author deleted"),
+            @ApiResponse(responseCode = "404", description = "No author with this id")
+    })
+    @DeleteMapping("/{authorId}")
+    @PreAuthorize("hasRole('librarian')")
+    public ResponseEntity<Void> deleteAuthor(@Parameter(description = "Id of the author") @PathVariable Long authorId){
+        authorService.deleteAuthor(authorId);
+        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+    }
+
+}

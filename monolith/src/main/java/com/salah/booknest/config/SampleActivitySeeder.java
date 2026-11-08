@@ -231,6 +231,7 @@ public class SampleActivitySeeder implements CommandLineRunner {
     private void review(User member, Book book, int rating, String comment) {
         Review review = new Review();
         review.setUser(member);
+        review.setUsername(member.getUsername());
         review.setBook(book);
         review.setRating(rating);
         review.setComment(comment);
