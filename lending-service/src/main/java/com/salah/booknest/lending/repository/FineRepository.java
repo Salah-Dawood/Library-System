@@ -1,0 +1,18 @@
+package com.salah.booknest.lending.repository;
+
+import com.salah.booknest.lending.model.Fine;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+
+import java.util.Optional;
+
+public interface FineRepository extends JpaRepository<Fine, Long> {
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<Fine> findWithLockById(Long id);
+
+    Page<Fine> findAllByLoanUserId(Long userId, Pageable pageable);
+}

@@ -53,11 +53,11 @@ public class LendingClient {
         return stock.stream().collect(Collectors.toMap(StockResponse::bookId, Function.identity()));
     }
 
-    public void createStock(Long bookId, int totalCopies) {
+    public void createStock(Long bookId, String bookTitle, int totalCopies) {
         call(() -> restClient.post()
                 .uri("/api/inventory")
                 .header(HttpHeaders.AUTHORIZATION, callerToken())
-                .body(Map.of("bookId", bookId, "totalCopies", totalCopies))
+                .body(Map.of("bookId", bookId, "bookTitle", bookTitle, "totalCopies", totalCopies))
                 .retrieve()
                 .toBodilessEntity());
     }

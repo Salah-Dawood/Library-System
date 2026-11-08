@@ -1,0 +1,94 @@
+package com.salah.booknest.lending.controller;
+
+import com.salah.booknest.lending.model.request.WaitlistRequest;
+import com.salah.booknest.lending.model.response.LoanResponse;
+import com.salah.booknest.lending.model.response.WaitlistResponse;
+import com.salah.booknest.lending.service.LoanService;
+import com.salah.booknest.lending.service.WaitlistService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@Tag(name = "Waitlist", description = "Members wait in line for a book that has no free copies.")
+@RestController
+@RequestMapping("/api/waitlist")
+@RequiredArgsConstructor
+public class WaitlistController {
+
+    private final WaitlistService waitlistService;
+    private final LoanService loanService;
+
+    @Operation(summary = "Join the waitlist for a book", description = "Only works when the book has no free copies. You can wait for at most 5 books and once per book. The position is your place in line, 1 means next.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Joined the waitlist"),
+            @ApiResponse(responseCode = "404", description = "No book with this id"),
+            @ApiResponse(responseCode = "409", description = "COPIES_AVAILABLE (borrow instead), RESOURCE_ALREADY_EXISTS (already waiting or on loan), WAITLIST_LIMIT_REACHED (5 books), or CONCURRENT_UPDATE (try again)")
+    })
+    @PostMapping
+    public ResponseEntity<WaitlistResponse> join(Authentication authentication,
+                                                 @Valid @RequestBody WaitlistRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(waitlistService.join(authentication, request));
+    }
+
+    @Operation(summary = "List my waitlist", description = "The books I am waiting for, with my position in each line. A hold has position 0 and a holdExpiresAt date.")
+    @GetMapping("/my")
+    public List<WaitlistResponse> getMyWaitlist(Authentication authentication) {
+        return waitlistService.getMyWaitlist(authentication);
+    }
+
+    @Operation(summary = "Get a waitlist entry", description = "Shows the current position (0 if no longer waiting). Only the owner or a librarian.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "403", description = "Not your waitlist entry"),
+            @ApiResponse(responseCode = "404", description = "No waitlist entry with this id")
+    })
+    @GetMapping("/{entryId}")
+    public WaitlistResponse getEntry(@PathVariable Long entryId, Authentication authentication) {
+        return waitlistService.getEntry(entryId, authentication);
+    }
+
+    @Operation(summary = "Leave the waitlist", description = "Everyone behind you moves up one place. If a copy is held for you it goes to the next person. Only the owner or a librarian.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "403", description = "Not your waitlist entry"),
+            @ApiResponse(responseCode = "404", description = "No waitlist entry with this id"),
+            @ApiResponse(responseCode = "409", description = "You are not waiting anymore")
+    })
+    @DeleteMapping("/{entryId}")
+    public WaitlistResponse leave(@PathVariable Long entryId, Authentication authentication) {
+        return waitlistService.leave(entryId, authentication);
+    }
+
+    @Operation(summary = "Claim my hold", description = "Borrows the copy that is held for you. days is the loan length, 1 to 30 (default 14).")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Copy borrowed"),
+            @ApiResponse(responseCode = "400", description = "Loan length is not between 1 and 30 days"),
+            @ApiResponse(responseCode = "403", description = "Not your hold"),
+            @ApiResponse(responseCode = "404", description = "No waitlist entry with this id"),
+            @ApiResponse(responseCode = "409", description = "NO_ACTIVE_HOLD, HOLD_EXPIRED, LOAN_LIMIT_REACHED (5 books), or CONCURRENT_UPDATE (try again)")
+    })
+    @PostMapping("/{entryId}/claim")
+    public ResponseEntity<LoanResponse> claim(@PathVariable Long entryId,
+                                              @RequestParam(defaultValue = "14") int days,
+                                              Authentication authentication) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(loanService.claimHold(entryId, days, authentication));
+    }
+
+    @Operation(summary = "List the waitlist of a book", description = "Everyone waiting for the book, first in line first. Members holding a copy come first with position 0. Librarian only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "404", description = "No book with this id")
+    })
+    @GetMapping("/book/{bookId}")
+    @PreAuthorize("hasRole('librarian')")
+    public List<WaitlistResponse> getQueueForBook(@PathVariable Long bookId) {
+        return waitlistService.getQueueForBook(bookId);
+    }
+}

@@ -141,7 +141,7 @@ public class BookService {
 
         Book savedBook = bookRepository.save(book);
         try {
-            lendingClient.createStock(savedBook.getId(), request.getTotalCopies());
+            lendingClient.createStock(savedBook.getId(), savedBook.getTitle(), request.getTotalCopies());
         } catch (RuntimeException e) {
             bookRepository.delete(savedBook);
             throw e;
