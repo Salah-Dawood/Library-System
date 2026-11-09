@@ -2,15 +2,15 @@ const STORAGE_KEY = "booknest.session";
 
 export const session = {
   get() {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || null; } catch (e) { return null; }
+    try { return JSON.parse(sessionStorage.getItem(STORAGE_KEY)) || null; } catch (e) { return null; }
   },
   set(value) {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(value)); } catch (e) { memory = value; }
+    try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(value)); } catch (e) { memory = value; }
     memory = value;
   },
   clear() {
     memory = null;
-    try { localStorage.removeItem(STORAGE_KEY); } catch (e) { /* ignore */ }
+    try { sessionStorage.removeItem(STORAGE_KEY); } catch (e) { /* ignore */ }
   },
   current() { return memory || this.get(); },
   token() { const s = this.current(); return s ? s.token : null; },
