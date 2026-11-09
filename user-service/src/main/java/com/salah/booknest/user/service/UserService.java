@@ -1,5 +1,6 @@
 package com.salah.booknest.user.service;
 
+import com.salah.booknest.user.event.UserEventPublisher;
 import com.salah.booknest.user.exception.InformationExistException;
 import com.salah.booknest.user.exception.InformationNotFoundException;
 import com.salah.booknest.user.exception.InvalidRequestException;
@@ -28,15 +29,18 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final JWTUtils jwtUtils;
     private final AuthenticationManager authenticationManager;
+    private final UserEventPublisher userEventPublisher;
 
     public UserService(UserRepository userRepository,
                        @Lazy PasswordEncoder passwordEncoder,
                        JWTUtils jwtUtils,
-                       @Lazy AuthenticationManager authenticationManager){
+                       @Lazy AuthenticationManager authenticationManager,
+                       UserEventPublisher userEventPublisher){
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtils = jwtUtils;
         this.authenticationManager = authenticationManager;
+        this.userEventPublisher = userEventPublisher;
     }
 
     //Find user services
@@ -72,6 +76,7 @@ public class UserService {
 
             user.setUserProfile(profile);
             User saved = userRepository.save(user);
+            userEventPublisher.userRegistered(saved);
             return saved;
         }
     }
