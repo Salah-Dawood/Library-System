@@ -16,7 +16,7 @@ import com.salah.booknest.lending.service.AuditLogService;
 import com.salah.booknest.lending.service.InventoryLocker;
 import com.salah.booknest.lending.service.LoanService;
 import com.salah.booknest.lending.service.MemberService;
-import com.salah.booknest.lending.service.NotificationService;
+import com.salah.booknest.lending.event.LendingEventPublisher;
 import com.salah.booknest.lending.service.WaitlistService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,7 +54,7 @@ class ClaimHoldTest {
     @Mock private InventoryLocker inventoryLocker;
     @Mock private FineRepository fineRepository;
     @Mock private AuditLogService auditLogService;
-    @Mock private NotificationService notificationService;
+    @Mock private LendingEventPublisher eventPublisher;
     @Mock private MemberService memberService;
     @Mock private WaitlistService waitlistService;
 

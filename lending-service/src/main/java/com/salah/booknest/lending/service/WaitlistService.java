@@ -1,5 +1,7 @@
 package com.salah.booknest.lending.service;
 
+import com.salah.booknest.lending.event.LendingEvent;
+import com.salah.booknest.lending.event.LendingEventPublisher;
 import com.salah.booknest.lending.exception.InformationExistException;
 import com.salah.booknest.lending.exception.InformationNotFoundException;
 import com.salah.booknest.lending.exception.InvalidStateException;
@@ -9,13 +11,11 @@ import com.salah.booknest.lending.model.Member;
 import com.salah.booknest.lending.model.WaitlistEntry;
 import com.salah.booknest.lending.model.WaitlistStatus;
 import com.salah.booknest.lending.model.request.WaitlistRequest;
-import com.salah.booknest.lending.model.response.NotificationEvent;
 import com.salah.booknest.lending.model.response.WaitlistResponse;
 import com.salah.booknest.lending.repository.InventoryRepository;
 import com.salah.booknest.lending.repository.LoanRepository;
 import com.salah.booknest.lending.repository.WaitlistRepository;
 import com.salah.booknest.lending.security.Roles;
-import com.salah.booknest.lending.util.TransactionUtils;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,7 +45,7 @@ public class WaitlistService {
     private final LoanRepository loanRepository;
     private final AuditLogService auditLogService;
     private final MemberService memberService;
-    private final NotificationService notificationService;
+    private final LendingEventPublisher eventPublisher;
     private final EntityManager entityManager;
 
     @Value("${app.holds.hours}")
@@ -219,9 +219,8 @@ public class WaitlistService {
     }
 
     private void notifyMember(WaitlistEntry entry, String type, String message) {
-        String username = entry.getUsername();
-        NotificationEvent event = new NotificationEvent(type, message, null, null, LocalDateTime.now());
-        TransactionUtils.afterCommit(() -> notificationService.notifyUser(username, event));
+        eventPublisher.publishAfterCommit(LendingEventPublisher.WAITLIST_EVENTS, LendingEvent.forMember(
+                type, entry.getUserId(), entry.getUsername(), null, null, message));
     }
 
     // position 1 means next in line, 0 means not waiting anymore

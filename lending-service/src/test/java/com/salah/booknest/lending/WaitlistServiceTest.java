@@ -15,7 +15,7 @@ import com.salah.booknest.lending.security.TokenUser;
 import com.salah.booknest.lending.service.AuditLogService;
 import com.salah.booknest.lending.service.InventoryLocker;
 import com.salah.booknest.lending.service.MemberService;
-import com.salah.booknest.lending.service.NotificationService;
+import com.salah.booknest.lending.event.LendingEventPublisher;
 import com.salah.booknest.lending.service.WaitlistService;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
@@ -62,7 +62,7 @@ class WaitlistServiceTest {
     @Mock private LoanRepository loanRepository;
     @Mock private AuditLogService auditLogService;
     @Mock private MemberService memberService;
-    @Mock private NotificationService notificationService;
+    @Mock private LendingEventPublisher eventPublisher;
     @Mock private EntityManager entityManager;
 
     @InjectMocks
