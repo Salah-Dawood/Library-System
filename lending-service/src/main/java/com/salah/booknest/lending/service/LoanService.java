@@ -1,5 +1,7 @@
 package com.salah.booknest.lending.service;
 
+import com.salah.booknest.lending.event.LendingEvent;
+import com.salah.booknest.lending.event.LendingEventPublisher;
 import com.salah.booknest.lending.exception.InformationExistException;
 import com.salah.booknest.lending.exception.InformationNotFoundException;
 import com.salah.booknest.lending.exception.InvalidRequestException;
@@ -8,14 +10,12 @@ import com.salah.booknest.lending.model.*;
 import com.salah.booknest.lending.model.request.LoanRequest;
 import com.salah.booknest.lending.model.request.ReviewReturnRequest;
 import com.salah.booknest.lending.model.response.LoanResponse;
-import com.salah.booknest.lending.model.response.NotificationEvent;
 import com.salah.booknest.lending.model.response.ReturnStats;
 import com.salah.booknest.lending.repository.InventoryRepository;
 import com.salah.booknest.lending.repository.FineRepository;
 import com.salah.booknest.lending.repository.LoanRepository;
 import com.salah.booknest.lending.security.Roles;
 import com.salah.booknest.lending.util.PageUtils;
-import com.salah.booknest.lending.util.TransactionUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -51,7 +51,7 @@ public class LoanService {
     private final InventoryRepository inventoryRepository;
     private final InventoryLocker inventoryLocker;
     private final FineRepository fineRepository;
-    private final NotificationService notificationService;
+    private final LendingEventPublisher eventPublisher;
     private final AuditLogService auditLogService;
     private final MemberService memberService;
     private final WaitlistService waitlistService;
@@ -418,18 +418,13 @@ public class LoanService {
     }
 
     private void notifyMember(Loan loan, String type, String message) {
-        String username = loan.getUsername();
-        NotificationEvent event = newEvent(loan, type, message);
-        TransactionUtils.afterCommit(() -> notificationService.notifyUser(username, event));
+        eventPublisher.publishAfterCommit(LendingEventPublisher.LOAN_EVENTS, LendingEvent.forMember(
+                type, loan.getUserId(), loan.getUsername(), loan.getId(), loan.getStatus().name(), message));
     }
 
     private void notifyLibrarians(Loan loan, String type, String message) {
-        NotificationEvent event = newEvent(loan, type, message);
-        TransactionUtils.afterCommit(() -> notificationService.notifyLibrarians(event));
-    }
-
-    private NotificationEvent newEvent(Loan loan, String type, String message) {
-        return new NotificationEvent(type, message, loan.getId(), loan.getStatus(), LocalDateTime.now());
+        eventPublisher.publishAfterCommit(LendingEventPublisher.LOAN_EVENTS, LendingEvent.forLibrarians(
+                type, loan.getUserId(), loan.getUsername(), loan.getId(), loan.getStatus().name(), message));
     }
 
     @Value("${app.fines.late-per-day}") private BigDecimal latePerDay;

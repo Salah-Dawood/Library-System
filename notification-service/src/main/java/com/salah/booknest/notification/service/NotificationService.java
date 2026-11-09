@@ -1,6 +1,6 @@
-package com.salah.booknest.lending.service;
+package com.salah.booknest.notification.service;
 
-import com.salah.booknest.lending.model.response.NotificationEvent;
+import com.salah.booknest.notification.model.NotificationEvent;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
