@@ -25,6 +25,12 @@ public class JwtRequestFilter extends OncePerRequestFilter {
 
     private final JWTUtils jwtUtils;
 
+    // the live notification stream finishes on a second (async) pass, which must be logged in too
+    @Override
+    protected boolean shouldNotFilterAsyncDispatch() {
+        return false;
+    }
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {

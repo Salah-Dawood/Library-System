@@ -1,7 +1,9 @@
 package com.salah.booknest.notification.event;
 
 import com.salah.booknest.notification.model.NotificationEvent;
+import com.salah.booknest.notification.model.ProcessedEvent;
 import com.salah.booknest.notification.model.Recipient;
+import com.salah.booknest.notification.repository.ProcessedEventRepository;
 import com.salah.booknest.notification.repository.RecipientRepository;
 import com.salah.booknest.notification.service.AsyncEmailService;
 import com.salah.booknest.notification.service.NotificationService;
@@ -10,6 +12,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.json.JsonMapper;
+
+import java.time.LocalDateTime;
 
 /**
  * Reacts to events from the other services: remembers email addresses and sends emails and live notifications.
@@ -26,9 +30,11 @@ public class EventListener {
 
     private final JsonMapper jsonMapper;
     private final RecipientRepository recipientRepository;
+    private final ProcessedEventRepository processedEventRepository;
     private final NotificationService notificationService;
     private final AsyncEmailService asyncEmailService;
 
+    // saving the same recipient twice just writes the same row again, so a repeated event does no harm
     @KafkaListener(topics = USER_EVENTS)
     public void onUserEvent(String json) {
         UserRegisteredEvent event = jsonMapper.readValue(json, UserRegisteredEvent.class);
@@ -36,19 +42,33 @@ public class EventListener {
         log.info("Recipient {} saved from UserRegistered event {}", event.username(), event.eventId());
     }
 
+    /**
+     * The email is sent first and its result is awaited: if it fails, an exception makes Kafka retry the
+     * whole event (see KafkaConfig). The live notification is only pushed once the email went out,
+     * so a retry never shows the same pop-up twice.
+     * An event whose id was already handled is skipped, so a repeated delivery never sends a second email.
+     */
     @KafkaListener(topics = {LOAN_EVENTS, WAITLIST_EVENTS})
     public void onLendingEvent(String json) {
         LendingEvent event = jsonMapper.readValue(json, LendingEvent.class);
+        if (processedEventRepository.existsById(event.eventId())) {
+            log.info("Event {} ({}) was already handled, skipped", event.eventId(), event.type());
+            return;
+        }
         NotificationEvent live = new NotificationEvent(event.type(), event.message(), event.loanId(), event.status(), event.occurredAt());
         log.info("Event {} ({}) for {}", event.eventId(), event.type(), event.forLibrarians() ? "librarians" : event.username());
 
         if (event.forLibrarians()) {
             notificationService.notifyLibrarians(live);
-            return;
+        } else {
+            String email = recipientRepository.findById(event.userId()).map(Recipient::getEmail).orElse(null);
+            boolean sent = asyncEmailService.sendNotificationEmail(event.username(), email, emailSubject(event.type()), event.message()).join();
+            if (email != null && !sent) {
+                throw new IllegalStateException("Email for event " + event.eventId() + " could not be sent");
+            }
+            notificationService.notifyUser(event.username(), live);
         }
-        notificationService.notifyUser(event.username(), live);
-        String email = recipientRepository.findById(event.userId()).map(Recipient::getEmail).orElse(null);
-        asyncEmailService.sendNotificationEmail(event.username(), email, emailSubject(event.type()), event.message());
+        processedEventRepository.save(new ProcessedEvent(event.eventId(), LocalDateTime.now()));
     }
 
     private String emailSubject(String type) {
