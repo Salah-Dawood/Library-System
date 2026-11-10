@@ -20,14 +20,23 @@ import org.springframework.test.context.ActiveProfiles;
 @Import(CucumberSpringConfig.NoEmailConfig.class)
 public class CucumberSpringConfig {
 
-    /** Builds the emails as usual but never sends them. */
+    /** Builds the emails as usual but keeps them in SentEmails instead of sending them. */
     @TestConfiguration
     static class NoEmailConfig {
+
         @Bean
-        JavaMailSender javaMailSender() {
+        SentEmails sentEmails() {
+            return new SentEmails();
+        }
+
+        @Bean
+        JavaMailSender javaMailSender(SentEmails sentEmails) {
             return new JavaMailSenderImpl() {
                 @Override
                 protected void doSend(MimeMessage[] mimeMessages, Object[] originalMessages) {
+                    for (MimeMessage message : mimeMessages) {
+                        sentEmails.add(message);
+                    }
                 }
             };
         }

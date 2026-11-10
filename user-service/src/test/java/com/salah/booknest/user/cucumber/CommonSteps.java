@@ -9,7 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * Steps every feature uses: a clean database before each scenario, and checks on the last response.
+ * Steps every feature uses: a clean database and no emails before each scenario, and checks on the last response.
  */
 public class CommonSteps {
 
@@ -19,9 +19,13 @@ public class CommonSteps {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private SentEmails sentEmails;
+
     @Before
-    public void cleanDatabase() {
+    public void startClean() {
         userRepository.deleteAll();
+        sentEmails.clear();
     }
 
     @When("someone checks the health of the service")
