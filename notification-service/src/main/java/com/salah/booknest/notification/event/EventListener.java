@@ -36,6 +36,11 @@ public class EventListener {
         log.info("Recipient {} saved from UserRegistered event {}", event.username(), event.eventId());
     }
 
+    /**
+     * The email is sent first and its result is awaited: if it fails, an exception makes Kafka retry the
+     * whole event (see KafkaConfig). The live notification is only pushed once the email went out,
+     * so a retry never shows the same pop-up twice.
+     */
     @KafkaListener(topics = {LOAN_EVENTS, WAITLIST_EVENTS})
     public void onLendingEvent(String json) {
         LendingEvent event = jsonMapper.readValue(json, LendingEvent.class);
@@ -46,9 +51,12 @@ public class EventListener {
             notificationService.notifyLibrarians(live);
             return;
         }
-        notificationService.notifyUser(event.username(), live);
         String email = recipientRepository.findById(event.userId()).map(Recipient::getEmail).orElse(null);
-        asyncEmailService.sendNotificationEmail(event.username(), email, emailSubject(event.type()), event.message());
+        boolean sent = asyncEmailService.sendNotificationEmail(event.username(), email, emailSubject(event.type()), event.message()).join();
+        if (email != null && !sent) {
+            throw new IllegalStateException("Email for event " + event.eventId() + " could not be sent");
+        }
+        notificationService.notifyUser(event.username(), live);
     }
 
     private String emailSubject(String type) {
