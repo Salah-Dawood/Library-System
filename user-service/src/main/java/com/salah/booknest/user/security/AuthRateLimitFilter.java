@@ -6,6 +6,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -20,10 +21,14 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
 
     private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
 
+    // requests per minute per IP on /auth/**
+    @Value("${app.auth-rate-limit:10}")
+    private int requestsPerMinute;
+
     private Bucket createBucket() {
         Bandwidth limit = Bandwidth.builder()
-                .capacity(10)
-                .refillGreedy(10, Duration.ofMinutes(1))
+                .capacity(requestsPerMinute)
+                .refillGreedy(requestsPerMinute, Duration.ofMinutes(1))
                 .build();
 
         return Bucket.builder()
