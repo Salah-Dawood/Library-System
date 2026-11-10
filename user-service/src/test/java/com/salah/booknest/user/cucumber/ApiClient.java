@@ -6,7 +6,9 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.io.ByteArrayOutputStream;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -62,6 +64,42 @@ public class ApiClient {
         } catch (Exception e) {
             throw new IllegalStateException("Request " + method + " " + path + " failed", e);
         }
+    }
+
+    /**
+     * Sends a form like a browser does when it uploads a file (multipart/form-data).
+     * fileName may be null to send only the text fields.
+     */
+    public void sendForm(String method, String path, String token, Map<String, String> fields,
+                         String fileName, String fileType, byte[] fileBytes) {
+        String boundary = "----BookNestTest" + System.nanoTime();
+        ByteArrayOutputStream body = new ByteArrayOutputStream();
+        fields.forEach((name, value) -> write(body, "--" + boundary + "\r\n"
+                + "Content-Disposition: form-data; name=\"" + name + "\"\r\n\r\n" + value + "\r\n"));
+        if (fileName != null) {
+            write(body, "--" + boundary + "\r\n"
+                    + "Content-Disposition: form-data; name=\"image\"; filename=\"" + fileName + "\"\r\n"
+                    + "Content-Type: " + fileType + "\r\n\r\n");
+            body.writeBytes(fileBytes);
+            write(body, "\r\n");
+        }
+        write(body, "--" + boundary + "--\r\n");
+        try {
+            HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+                    .header("Content-Type", "multipart/form-data; boundary=" + boundary)
+                    .header("Authorization", "Bearer " + token)
+                    .method(method, HttpRequest.BodyPublishers.ofByteArray(body.toByteArray()))
+                    .build();
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            lastStatus = response.statusCode();
+            lastBody = response.body();
+        } catch (Exception e) {
+            throw new IllegalStateException("Form " + method + " " + path + " failed", e);
+        }
+    }
+
+    private static void write(ByteArrayOutputStream body, String text) {
+        body.writeBytes(text.getBytes(StandardCharsets.UTF_8));
     }
 
     public int lastStatus() {
