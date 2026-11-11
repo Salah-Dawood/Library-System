@@ -7,4 +7,4 @@ COPY --from=docker:cli /usr/local/bin/docker /usr/local/bin/docker
 COPY --from=docker:cli /usr/local/libexec/docker/cli-plugins /usr/local/libexec/docker/cli-plugins
 
 # the plugins the BookNest pipeline uses, installed when the image is built
-RUN jenkins-plugin-cli --plugins git workflow-aggregator docker-workflow htmlpublisher junit credentials-binding ssh-agent blueocean
+RUN jenkins-plugin-cli --plugins git workflow-aggregator docker-workflow junit credentials-binding ssh-agent blueocean
