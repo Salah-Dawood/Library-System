@@ -23,8 +23,6 @@ public class SecurityConfiguration {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtAuthenticationEntryPoint))
                 .authorizeHttpRequests(auth -> auth.requestMatchers(
-                                "/", "/index.html", "/favicon.ico", "/*.js", "/*.css","/*.html",
-                                "/static/**", "/css/**", "/js/**", "/images/**",
                                 "/actuator/health",
                                 "/error",
                                 "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**"
