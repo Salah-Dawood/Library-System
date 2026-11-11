@@ -1,5 +1,5 @@
 # The whole of BookNest:   docker compose up --build
-# Only the infrastructure, for running the services from IntelliJ:   docker compose up -d postgres kafka
+# Only what the services need, when they run from IntelliJ:   docker compose up -d postgres kafka frontend
 # Secrets come from the .env file next to this one (copy .env.example to .env and fill it in).
 
 services:
@@ -134,7 +134,7 @@ services:
       CATALOG_SERVICE_URL: http://catalog-service:8082
       LENDING_SERVICE_URL: http://lending-service:8083
       NOTIFICATION_SERVICE_URL: http://notification-service:8084
-      FRONTEND_URL: http://lending-service:8083
+      FRONTEND_URL: http://frontend:80
     ports:
       - "8080:8080"   # the only service your browser talks to
     depends_on:
@@ -146,6 +146,16 @@ services:
         condition: service_healthy
       notification-service:
         condition: service_healthy
+      frontend:
+        condition: service_started
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    image: booknest/frontend:dev
+    ports:
+      - "3000:80"     # so the gateway can also reach it when the services run from IntelliJ
 
 volumes:
   postgres-data:
