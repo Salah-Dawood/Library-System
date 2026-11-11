@@ -1,0 +1,19 @@
+# Jenkins for BookNest, on http://localhost:8090
+#   start:  docker compose -f jenkins/docker-compose.yml up -d --build
+#   stop:   docker compose -f jenkins/docker-compose.yml down
+services:
+  jenkins:
+    build: .
+    image: booknest/jenkins:dev
+    container_name: booknest-jenkins
+    # root inside the container so it may use the Docker socket below (local machine only)
+    user: root
+    ports:
+      - "8090:8080"
+    volumes:
+      - jenkins-home:/var/jenkins_home
+      # lets the pipeline build and push images with the Docker of this PC
+      - /var/run/docker.sock:/var/run/docker.sock
+
+volumes:
+  jenkins-home:
