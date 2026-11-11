@@ -1,0 +1,8 @@
+**/target
+**/profile
+.git
+.idea
+**/*.iml
+.env
+*.md
+*.png

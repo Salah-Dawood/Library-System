@@ -32,3 +32,6 @@ build/
 ### VS Code ###
 .vscode/
 profile/
+
+### Secrets for Docker Compose ###
+.env
