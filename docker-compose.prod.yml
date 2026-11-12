@@ -3,14 +3,6 @@
 #   docker compose -f docker-compose.prod.yml up -d
 # Settings come from the .env file on the server (see .env.prod.example); VERSION picks the image tag.
 
-# every service writes its logs to CloudWatch Logs, group "booknest", one stream per service
-x-logging: &cloudwatch
-  driver: awslogs
-  options:
-    awslogs-region: ${AWS_REGION:-us-east-1}
-    awslogs-group: booknest
-    awslogs-create-group: "true"
-
 # the settings every Spring Boot service shares
 x-spring: &spring
   restart: unless-stopped
@@ -47,13 +39,6 @@ services:
       test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
       interval: 10s
       retries: 20
-    logging:
-      <<: *cloudwatch
-      options:
-        awslogs-region: ${AWS_REGION:-us-east-1}
-        awslogs-group: booknest
-        awslogs-create-group: "true"
-        awslogs-stream: kafka
 
   user-service:
     <<: *spring
@@ -73,13 +58,6 @@ services:
       interval: 10s
       start_period: 60s
       retries: 12
-    logging:
-      <<: *cloudwatch
-      options:
-        awslogs-region: ${AWS_REGION:-us-east-1}
-        awslogs-group: booknest
-        awslogs-create-group: "true"
-        awslogs-stream: user-service
 
   catalog-service:
     <<: *spring
@@ -89,13 +67,6 @@ services:
       LENDING_SERVICE_URL: http://lending-service:8083
       SERVER_PORT: 8082
     healthcheck: *service-health
-    logging:
-      <<: *cloudwatch
-      options:
-        awslogs-region: ${AWS_REGION:-us-east-1}
-        awslogs-group: booknest
-        awslogs-create-group: "true"
-        awslogs-stream: catalog-service
 
   lending-service:
     <<: *spring
@@ -109,13 +80,6 @@ services:
       kafka:
         condition: service_healthy
     healthcheck: *service-health
-    logging:
-      <<: *cloudwatch
-      options:
-        awslogs-region: ${AWS_REGION:-us-east-1}
-        awslogs-group: booknest
-        awslogs-create-group: "true"
-        awslogs-stream: lending-service
 
   notification-service:
     <<: *spring
@@ -129,25 +93,11 @@ services:
       kafka:
         condition: service_healthy
     healthcheck: *service-health
-    logging:
-      <<: *cloudwatch
-      options:
-        awslogs-region: ${AWS_REGION:-us-east-1}
-        awslogs-group: booknest
-        awslogs-create-group: "true"
-        awslogs-stream: notification-service
 
   frontend:
     image: ${DOCKERHUB_USER:-sala76}/booknest-frontend:${VERSION:-latest}
     restart: unless-stopped
     mem_limit: 64m
-    logging:
-      <<: *cloudwatch
-      options:
-        awslogs-region: ${AWS_REGION:-us-east-1}
-        awslogs-group: booknest
-        awslogs-create-group: "true"
-        awslogs-stream: frontend
 
   api-gateway:
     image: ${DOCKERHUB_USER:-sala76}/booknest-api-gateway:${VERSION:-latest}
@@ -173,13 +123,6 @@ services:
         condition: service_healthy
       frontend:
         condition: service_started
-    logging:
-      <<: *cloudwatch
-      options:
-        awslogs-region: ${AWS_REGION:-us-east-1}
-        awslogs-group: booknest
-        awslogs-create-group: "true"
-        awslogs-stream: api-gateway
 
 volumes:
   kafka-data:
