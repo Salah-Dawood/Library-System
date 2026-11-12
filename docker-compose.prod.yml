@@ -1,0 +1,186 @@
+# BookNest on the AWS server (EC2). The database is RDS, the images come from Docker Hub.
+#   docker compose -f docker-compose.prod.yml pull
+#   docker compose -f docker-compose.prod.yml up -d
+# Settings come from the .env file on the server (see .env.prod.example); VERSION picks the image tag.
+
+# every service writes its logs to CloudWatch Logs, group "booknest", one stream per service
+x-logging: &cloudwatch
+  driver: awslogs
+  options:
+    awslogs-region: ${AWS_REGION:-us-east-1}
+    awslogs-group: booknest
+    awslogs-create-group: "true"
+
+# the settings every Spring Boot service shares
+x-spring: &spring
+  restart: unless-stopped
+  mem_limit: 512m
+  environment: &spring-env
+    SPRING_PROFILES_ACTIVE: prod
+    JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=75
+    DB_URL: jdbc:postgresql://${DB_HOST}:5432/booknest
+    DB_PASSWORD: ${DB_PASSWORD}
+    JWT_SECRET: ${JWT_SECRET}
+    KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+
+services:
+
+  kafka:
+    image: apache/kafka:4.1.0
+    restart: unless-stopped
+    mem_limit: 768m
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_HEAP_OPTS: -Xms256m -Xmx512m
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      interval: 10s
+      retries: 20
+    logging:
+      <<: *cloudwatch
+      options:
+        awslogs-region: ${AWS_REGION:-us-east-1}
+        awslogs-group: booknest
+        awslogs-create-group: "true"
+        awslogs-stream: kafka
+
+  user-service:
+    <<: *spring
+    image: ${DOCKERHUB_USER:-sala76}/booknest-user-service:${VERSION:-latest}
+    environment:
+      <<: *spring-env
+      EMAIL_USERNAME: ${EMAIL_USERNAME}
+      EMAIL_PASSWORD: ${EMAIL_PASSWORD}
+      PUBLIC_URL: ${PUBLIC_URL}
+    volumes:
+      - profile-images:/app/profile
+    depends_on:
+      kafka:
+        condition: service_healthy
+    healthcheck: &service-health
+      test: ["CMD-SHELL", "curl -fs http://localhost:$${SERVER_PORT:-8081}/actuator/health > /dev/null"]
+      interval: 10s
+      start_period: 60s
+      retries: 12
+    logging:
+      <<: *cloudwatch
+      options:
+        awslogs-region: ${AWS_REGION:-us-east-1}
+        awslogs-group: booknest
+        awslogs-create-group: "true"
+        awslogs-stream: user-service
+
+  catalog-service:
+    <<: *spring
+    image: ${DOCKERHUB_USER:-sala76}/booknest-catalog-service:${VERSION:-latest}
+    environment:
+      <<: *spring-env
+      LENDING_SERVICE_URL: http://lending-service:8083
+      SERVER_PORT: 8082
+    healthcheck: *service-health
+    logging:
+      <<: *cloudwatch
+      options:
+        awslogs-region: ${AWS_REGION:-us-east-1}
+        awslogs-group: booknest
+        awslogs-create-group: "true"
+        awslogs-stream: catalog-service
+
+  lending-service:
+    <<: *spring
+    image: ${DOCKERHUB_USER:-sala76}/booknest-lending-service:${VERSION:-latest}
+    environment:
+      <<: *spring-env
+      # the race demo stays on so the concurrency rules can be shown on the live server
+      SPRING_PROFILES_ACTIVE: prod,race-demo
+      SERVER_PORT: 8083
+    depends_on:
+      kafka:
+        condition: service_healthy
+    healthcheck: *service-health
+    logging:
+      <<: *cloudwatch
+      options:
+        awslogs-region: ${AWS_REGION:-us-east-1}
+        awslogs-group: booknest
+        awslogs-create-group: "true"
+        awslogs-stream: lending-service
+
+  notification-service:
+    <<: *spring
+    image: ${DOCKERHUB_USER:-sala76}/booknest-notification-service:${VERSION:-latest}
+    environment:
+      <<: *spring-env
+      EMAIL_USERNAME: ${EMAIL_USERNAME}
+      EMAIL_PASSWORD: ${EMAIL_PASSWORD}
+      SERVER_PORT: 8084
+    depends_on:
+      kafka:
+        condition: service_healthy
+    healthcheck: *service-health
+    logging:
+      <<: *cloudwatch
+      options:
+        awslogs-region: ${AWS_REGION:-us-east-1}
+        awslogs-group: booknest
+        awslogs-create-group: "true"
+        awslogs-stream: notification-service
+
+  frontend:
+    image: ${DOCKERHUB_USER:-sala76}/booknest-frontend:${VERSION:-latest}
+    restart: unless-stopped
+    mem_limit: 64m
+    logging:
+      <<: *cloudwatch
+      options:
+        awslogs-region: ${AWS_REGION:-us-east-1}
+        awslogs-group: booknest
+        awslogs-create-group: "true"
+        awslogs-stream: frontend
+
+  api-gateway:
+    image: ${DOCKERHUB_USER:-sala76}/booknest-api-gateway:${VERSION:-latest}
+    restart: unless-stopped
+    mem_limit: 512m
+    environment:
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=75
+      USER_SERVICE_URL: http://user-service:8081
+      CATALOG_SERVICE_URL: http://catalog-service:8082
+      LENDING_SERVICE_URL: http://lending-service:8083
+      NOTIFICATION_SERVICE_URL: http://notification-service:8084
+      FRONTEND_URL: http://frontend:80
+    ports:
+      - "80:8080"   # the site is on the normal web port of the server
+    depends_on:
+      user-service:
+        condition: service_healthy
+      catalog-service:
+        condition: service_healthy
+      lending-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
+      frontend:
+        condition: service_started
+    logging:
+      <<: *cloudwatch
+      options:
+        awslogs-region: ${AWS_REGION:-us-east-1}
+        awslogs-group: booknest
+        awslogs-create-group: "true"
+        awslogs-stream: api-gateway
+
+volumes:
+  kafka-data:
+  profile-images:
