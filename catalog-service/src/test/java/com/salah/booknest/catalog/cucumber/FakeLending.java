@@ -40,6 +40,12 @@ public final class FakeLending {
         }
     }
 
+    /** UP answers normally, DOWN drops every connection without an answer, BROKEN answers 500. */
+    public enum Mode { UP, DOWN, BROKEN }
+
+    private volatile Mode mode = Mode.UP;
+    private volatile String lastCaller;
+
     private final HttpServer server;
     private final Map<Long, Stock> stock = new ConcurrentHashMap<>();
     // "username:bookId" of every member who returned a book
@@ -65,6 +71,17 @@ public final class FakeLending {
         stock.clear();
         returned.clear();
         requests.clear();
+        mode = Mode.UP;
+        lastCaller = null;
+    }
+
+    public void setMode(Mode mode) {
+        this.mode = mode;
+    }
+
+    /** The username in the token of the last request catalog-service sent. */
+    public String lastCaller() {
+        return lastCaller;
     }
 
     public void markReturned(String username, long bookId) {
@@ -90,6 +107,17 @@ public final class FakeLending {
         String path = exchange.getRequestURI().getPath();
         String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
         requests.add(method + " " + path);
+        lastCaller = usernameOf(exchange.getRequestHeaders().getFirst("Authorization"));
+
+        if (mode == Mode.DOWN) {
+            // the connection is cut without any answer, as when the service has crashed
+            exchange.close();
+            return;
+        }
+        if (mode == Mode.BROKEN) {
+            reply(exchange, 500, error(500, "INTERNAL_ERROR", "An unexpected error occurred"));
+            return;
+        }
 
         if (method.equals("GET") && path.equals("/api/inventory")) {
             String ids = exchange.getRequestURI().getQuery().replace("bookIds=", "");
