@@ -110,6 +110,12 @@ public class LoanSteps {
         api.send("PUT", "/api/loans/" + state.loan(member, title) + "/return", state.token(member), null);
     }
 
+    @When("the librarian records the return of {string} by {string}")
+    public void librarianRecordsReturn(String title, String member) {
+        api.send("PUT", "/api/loans/" + state.loan(member, title) + "/return", state.token("the librarian"), null);
+        assertEquals(200, api.last().status(), "could not record the return: " + api.last().body());
+    }
+
     @When("{string} returns the loan of {string} by {string}")
     public void returnsSomeoneElses(String member, String title, String borrower) {
         api.send("PUT", "/api/loans/" + state.loan(borrower, title) + "/return", state.token(member), null);

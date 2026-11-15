@@ -96,6 +96,12 @@
 			<artifactId>h2</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<!-- a real Kafka broker inside the tests (no Docker), so the scenarios can read the published events -->
+		<dependency>
+			<groupId>org.springframework.kafka</groupId>
+			<artifactId>spring-kafka-test</artifactId>
+			<scope>test</scope>
+		</dependency>
 		<!-- Cucumber: the scenarios in src/test/resources/features -->
 		<dependency>
 			<groupId>io.cucumber</groupId>
