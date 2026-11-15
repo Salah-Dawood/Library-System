@@ -11,7 +11,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * The members, librarians, books and loans of one scenario, by the names the feature files use.
+ * The members, librarians, books, loans and waitlist places of one scenario, by the names the feature files use.
  * Every name becomes a fresh member or book with its own id, so scenarios never see each other's data.
  * A new one is made for every scenario.
  */
@@ -24,10 +24,15 @@ public class LendingState {
     private final Map<String, TestUser> users = new HashMap<>();
     private final Map<String, TestBook> books = new HashMap<>();
     private final Map<String, Long> loans = new HashMap<>();
+    private final Map<String, Long> entries = new HashMap<>();
 
     /** The member with this name, created the first time it is used. */
     public TestUser member(String name) {
         return users.computeIfAbsent(name, key -> data.newUser());
+    }
+
+    public boolean hasMember(String name) {
+        return users.containsKey(name);
     }
 
     public TestUser librarian() {
@@ -48,6 +53,18 @@ public class LendingState {
             throw new IllegalStateException("The library has no \"" + title + "\" in this scenario");
         }
         return book;
+    }
+
+    public void rememberEntry(String member, String title, long entryId) {
+        entries.put(member + "/" + title, entryId);
+    }
+
+    public long entry(String member, String title) {
+        Long id = entries.get(member + "/" + title);
+        if (id == null) {
+            throw new IllegalStateException(member + " is not on the waitlist of \"" + title + "\" in this scenario");
+        }
+        return id;
     }
 
     public void rememberLoan(String member, String title, long loanId) {

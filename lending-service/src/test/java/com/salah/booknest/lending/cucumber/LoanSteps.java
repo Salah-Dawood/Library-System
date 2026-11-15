@@ -87,6 +87,11 @@ public class LoanSteps {
         borrows(member, title, 7);
     }
 
+    @When("someone borrows {string} without logging in")
+    public void borrowsWithoutLogin(String title) {
+        api.send("POST", "/api/loans", null, "{\"bookId\":" + state.book(title).id() + ",\"duration\":7}");
+    }
+
     @When("{string} borrows without saying which book")
     public void borrowsNoBook(String member) {
         api.send("POST", "/api/loans", state.token(member), "{\"duration\":7}");

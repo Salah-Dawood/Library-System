@@ -22,6 +22,12 @@ Feature: Borrowing books
     When "alice" borrows "Clean Code" for 31 days
     Then the response status is 400
     And no loan of "Clean Code" was created
+    And "Clean Code" has 3 of 3 copies on the shelf
+
+  Scenario: Borrowing needs a login
+    When someone borrows "Clean Code" without logging in
+    Then the response status is 401
+    And "Clean Code" has 3 of 3 copies on the shelf
 
   Scenario: The book must be named
     When "alice" borrows without saying which book

@@ -15,9 +15,7 @@ import tools.jackson.databind.JsonNode;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -33,8 +31,7 @@ public class WaitlistSteps {
     @Autowired private WaitlistRepository waitlistRepository;
     @Autowired private HoldExpiryJob holdExpiryJob;
 
-    // the waitlist entry of each member and book, and the extra holds of the expiry scenarios
-    private final Map<String, Long> entries = new HashMap<>();
+    // the extra holds of the expiry scenarios
     private final List<WaitlistEntry> ranOut = new ArrayList<>();
     private final List<TestBook> ranOutBooks = new ArrayList<>();
     private WaitlistEntry notOverYet;
@@ -46,7 +43,7 @@ public class WaitlistSteps {
     public void joins(String member, String title) {
         Reply reply = api.send("POST", "/api/waitlist", state.token(member), "{\"bookId\":" + state.book(title).id() + "}");
         if (reply.status() == 201) {
-            entries.put(member + "/" + title, api.json(reply).get("id").asLong());
+            state.rememberEntry(member, title, api.json(reply).get("id").asLong());
         }
     }
 
@@ -189,10 +186,6 @@ public class WaitlistSteps {
     }
 
     private long entry(String member, String title) {
-        Long id = entries.get(member + "/" + title);
-        if (id == null) {
-            throw new IllegalStateException(member + " is not on the waitlist of \"" + title + "\" in this scenario");
-        }
-        return id;
+        return state.entry(member, title);
     }
 }
