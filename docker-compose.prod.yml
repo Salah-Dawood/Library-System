@@ -3,8 +3,22 @@
 #   docker compose -f docker-compose.prod.yml up -d
 # Settings come from the .env file on the server (see .env.prod.example); VERSION picks the image tag.
 
+# every container sends its logs to CloudWatch Logs (group /booknest/prod, one stream per container,
+# for example booknest-lending-service-1); the server's IAM role allows the writing.
+# non-blocking: if CloudWatch cannot be reached, logs wait in a small buffer instead of freezing the service.
+x-logging: &cloudwatch
+  logging:
+    driver: awslogs
+    options:
+      awslogs-region: ${AWS_REGION:-us-east-1}
+      awslogs-group: /booknest/prod
+      tag: "{{.Name}}"
+      mode: non-blocking
+      max-buffer-size: 4m
+
 # the settings every Spring Boot service shares
 x-spring: &spring
+  <<: *cloudwatch
   restart: unless-stopped
   mem_limit: 512m
   environment: &spring-env
@@ -18,6 +32,7 @@ x-spring: &spring
 services:
 
   kafka:
+    <<: *cloudwatch
     image: apache/kafka:4.1.0
     restart: unless-stopped
     mem_limit: 768m
@@ -95,11 +110,13 @@ services:
     healthcheck: *service-health
 
   frontend:
+    <<: *cloudwatch
     image: ${DOCKERHUB_USER:-sala76}/booknest-frontend:${VERSION:-latest}
     restart: unless-stopped
     mem_limit: 64m
 
   api-gateway:
+    <<: *cloudwatch
     image: ${DOCKERHUB_USER:-sala76}/booknest-api-gateway:${VERSION:-latest}
     restart: unless-stopped
     mem_limit: 512m
