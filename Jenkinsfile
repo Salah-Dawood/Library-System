@@ -38,9 +38,9 @@ pipeline {
             }
             post {
                 always {
-                    // test results appear on the build page; the Cucumber report is kept as a file to download
+                    // test results appear on the build page; each service's Cucumber report is kept as a file to download
                     junit testResults: '**/target/surefire-reports/*.xml', allowEmptyResults: true
-                    archiveArtifacts artifacts: 'user-service/target/cucumber-report.html', allowEmptyArchive: true
+                    archiveArtifacts artifacts: '*/target/cucumber-report.html', allowEmptyArchive: true
                 }
             }
         }

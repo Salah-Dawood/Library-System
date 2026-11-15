@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
@@ -18,6 +19,8 @@ import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.net.http.HttpClient;
+import java.time.Duration;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -35,8 +38,17 @@ public class LendingClient {
 
     private final RestClient restClient;
 
-    public LendingClient(@Value("${lending-service.url}") String lendingUrl) {
-        this.restClient = RestClient.builder().baseUrl(lendingUrl).build();
+    /**
+     * A stuck lending-service must not make catalog-service wait forever: the connection has to open within
+     * connectTimeout and the answer has to arrive within readTimeout, otherwise the caller gets a 503.
+     */
+    public LendingClient(@Value("${lending-service.url}") String lendingUrl,
+                         @Value("${lending-service.connect-timeout:2s}") Duration connectTimeout,
+                         @Value("${lending-service.read-timeout:5s}") Duration readTimeout) {
+        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(
+                HttpClient.newBuilder().connectTimeout(connectTimeout).build());
+        requestFactory.setReadTimeout(readTimeout);
+        this.restClient = RestClient.builder().baseUrl(lendingUrl).requestFactory(requestFactory).build();
     }
 
     /** Copy counts by book id. Books without stock are missing from the map. */
