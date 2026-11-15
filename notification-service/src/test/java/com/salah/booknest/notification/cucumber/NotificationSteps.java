@@ -19,15 +19,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 public class NotificationSteps {
 
     @Autowired private Events events;
+    @Autowired private LastEvent last;
     @Autowired private RecipientRepository recipientRepository;
     @Autowired private ProcessedEventRepository processedEventRepository;
     @Autowired private SentEmails sentEmails;
-
-    // the last lending event of this scenario, so it can be sent again
-    private String lastTopic;
-    private String lastUsername;
-    private String lastJson;
-    private String lastEventId;
 
     @Given("{string} registered with the email {string}")
     public void registered(String username, String email) {
@@ -59,7 +54,7 @@ public class NotificationSteps {
 
     @When("lending-service announces the same event again")
     public void sameEventAgain() {
-        events.publish(lastTopic, lastUsername, lastJson);
+        events.publish(last.topic(), last.username(), last.json());
     }
 
     @Then("{string} receives an email {string}")
@@ -70,7 +65,7 @@ public class NotificationSteps {
 
     @Then("the event is handled")
     public void eventIsHandled() {
-        String eventId = lastEventId;
+        String eventId = last.eventId();
         waitUntil(() -> processedEventRepository.existsById(eventId), "event " + eventId + " was never handled");
     }
 
@@ -91,16 +86,14 @@ public class NotificationSteps {
      */
     private void everythingBeforeIsHandled() {
         String markerId = UUID.randomUUID().toString();
-        events.publish(lastTopic, lastUsername,
-                Events.lendingEvent(markerId, "MARKER", "LIBRARIANS", lastUsername, "end of the scenario"));
+        events.publish(last.topic(), last.username(),
+                Events.lendingEvent(markerId, "MARKER", "LIBRARIANS", last.username(), "end of the scenario"));
         waitUntil(() -> processedEventRepository.existsById(markerId), "the marker event was never handled");
     }
 
     private void announce(String topic, String type, String audience, String username) {
-        lastTopic = topic;
-        lastUsername = username;
-        lastEventId = UUID.randomUUID().toString();
-        lastJson = Events.lendingEvent(lastEventId, type, audience, username, "Update about your book");
-        events.publish(topic, username, lastJson);
+        String eventId = UUID.randomUUID().toString();
+        String json = Events.lendingEvent(eventId, type, audience, username, "Update about your book");
+        last.set(topic, username, json, eventId, events.publish(topic, username, json));
     }
 }
