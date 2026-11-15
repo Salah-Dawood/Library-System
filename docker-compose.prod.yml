@@ -79,12 +79,17 @@ services:
     image: ${DOCKERHUB_USER:-sala76}/booknest-catalog-service:${VERSION:-latest}
     environment:
       <<: *spring-env
-      LENDING_SERVICE_URL: http://lending-service:8083
+      LENDING_SERVICE_URL: http://lending-lb
       SERVER_PORT: 8082
     healthcheck: *service-health
 
+  # two copies of lending-service share the database and Kafka; lending-lb splits the requests between them.
+  # the borrowing rules lock rows in the database, so both copies stay consistent;
+  # ShedLock makes sure only one copy runs each scheduled job.
   lending-service:
     <<: *spring
+    deploy:
+      replicas: 2
     image: ${DOCKERHUB_USER:-sala76}/booknest-lending-service:${VERSION:-latest}
     environment:
       <<: *spring-env
@@ -95,6 +100,24 @@ services:
       kafka:
         condition: service_healthy
     healthcheck: *service-health
+
+  # the load balancer of lending-service: each request goes to the next copy in turn.
+  # the X-Lending-Instance reply header and the log line show which copy answered.
+  lending-lb:
+    <<: *cloudwatch
+    image: nginx:1.29-alpine
+    restart: unless-stopped
+    mem_limit: 64m
+    configs:
+      - source: lending-lb
+        target: /etc/nginx/conf.d/default.conf
+    depends_on:
+      lending-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost/lb-health"]
+      interval: 10s
+      retries: 6
 
   notification-service:
     <<: *spring
@@ -124,7 +147,7 @@ services:
       JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=75
       USER_SERVICE_URL: http://user-service:8081
       CATALOG_SERVICE_URL: http://catalog-service:8082
-      LENDING_SERVICE_URL: http://lending-service:8083
+      LENDING_SERVICE_URL: http://lending-lb
       NOTIFICATION_SERVICE_URL: http://notification-service:8084
       FRONTEND_URL: http://frontend:80
     ports:
@@ -134,7 +157,7 @@ services:
         condition: service_healthy
       catalog-service:
         condition: service_healthy
-      lending-service:
+      lending-lb:
         condition: service_healthy
       notification-service:
         condition: service_healthy
@@ -144,3 +167,41 @@ services:
 volumes:
   kafka-data:
   profile-images:
+
+configs:
+  # nginx settings of lending-lb ($$ is a single $ for nginx; compose would read $ as one of its own variables)
+  lending-lb:
+    content: |
+      # Docker's own DNS: the addresses of the lending-service copies are looked up again every 10 seconds,
+      # so a restarted or redeployed copy is found at its new address
+      resolver 127.0.0.11 valid=10s ipv6=off;
+
+      upstream lending {
+          zone lending 64k;
+          server lending-service:8083 resolve;
+      }
+
+      log_format balanced '$$remote_addr "$$request" $$status -> $$upstream_addr in $$request_time s';
+
+      server {
+          listen 80;
+          access_log /dev/stdout balanced;
+
+          location = /lb-health {
+              access_log off;
+              return 200 "ok\n";
+          }
+
+          location / {
+              proxy_pass http://lending;
+              proxy_http_version 1.1;
+              proxy_set_header Connection "";
+              proxy_set_header Host $$host;
+              proxy_set_header X-Forwarded-For $$proxy_add_x_forwarded_for;
+              # a copy that does not answer within 2 s is skipped (and left out for 10 s);
+              # a failed GET is then tried on the other copy, a POST such as a borrow is never sent twice
+              proxy_connect_timeout 2s;
+              proxy_next_upstream error timeout;
+              add_header X-Lending-Instance $$upstream_addr always;
+          }
+      }
