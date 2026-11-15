@@ -3,6 +3,7 @@ package com.salah.booknest.lending.job;
 import com.salah.booknest.lending.service.WaitlistService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -25,8 +26,10 @@ public class HoldExpiryJob {
     private final WaitlistService waitlistService;
     private final ThreadPoolExecutor threadPoolExecutor;
 
-    // every minute: expire the holds that were not claimed
+    // every minute: expire the holds that were not claimed.
+    // only one instance does it per minute, so a hold is never expired (and announced) by two instances at once
     @Scheduled(fixedDelay = 60000)
+    @SchedulerLock(name = "holdExpiry", lockAtMostFor = "2m", lockAtLeastFor = "30s")
     public void expireHolds() {
         List<Long> ids = waitlistService.getExpiredHoldIds();
         if (ids.isEmpty()) {

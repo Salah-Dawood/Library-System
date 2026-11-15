@@ -7,6 +7,7 @@ import com.salah.booknest.lending.model.LoanStatus;
 import com.salah.booknest.lending.repository.LoanRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -23,8 +24,12 @@ public class DueReminderJob {
     private final LoanRepository loanRepository;
     private final LendingEventPublisher eventPublisher;
 
-    // remind members whose book is due tomorrow; notification-service sends the emails
+    // remind members whose book is due tomorrow; notification-service sends the emails.
+    // only one instance sends them: the others find the lock taken and skip, so nobody gets the reminder twice.
+    // lockAtLeastFor keeps it taken for a while, even when the run is quick, so an instance whose clock is
+    // a little behind cannot start the same 09:00 run again.
     @Scheduled(cron = "${app.reminders.cron}")
+    @SchedulerLock(name = "dueReminders", lockAtMostFor = "10m", lockAtLeastFor = "5m")
     public void sendDueReminders() {
         List<Loan> loans = loanRepository.findAllByStatusAndDueDate(LoanStatus.BORROWED, LocalDate.now().plusDays(1));
         if (loans.isEmpty()) {
