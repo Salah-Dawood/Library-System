@@ -8,6 +8,8 @@ import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Base64;
+import java.util.Set;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +42,8 @@ public final class FakeLending {
 
     private final HttpServer server;
     private final Map<Long, Stock> stock = new ConcurrentHashMap<>();
+    // "username:bookId" of every member who returned a book
+    private final Set<String> returned = ConcurrentHashMap.newKeySet();
     private final List<String> requests = Collections.synchronizedList(new ArrayList<>());
 
     private FakeLending() {
@@ -59,7 +63,12 @@ public final class FakeLending {
     /** Back to an empty lending-service before every scenario. */
     public void reset() {
         stock.clear();
+        returned.clear();
         requests.clear();
+    }
+
+    public void markReturned(String username, long bookId) {
+        returned.add(username + ":" + bookId);
     }
 
     public Integer totalCopies(long bookId) {
@@ -98,6 +107,11 @@ public final class FakeLending {
             }
             stock.put(bookId, new Stock((int) number(body, "totalCopies")));
             reply(exchange, 201, stock.get(bookId).json(bookId));
+        } else if (method.equals("GET") && path.startsWith("/api/loans/returned/")) {
+            // like lending-service, it answers for the member whose token catalog-service passed on
+            long bookId = Long.parseLong(path.substring("/api/loans/returned/".length()));
+            String username = usernameOf(exchange.getRequestHeaders().getFirst("Authorization"));
+            reply(exchange, 200, String.valueOf(returned.contains(username + ":" + bookId)));
         } else if (path.startsWith("/api/inventory/")) {
             long bookId = Long.parseLong(path.substring("/api/inventory/".length()));
             Stock s = stock.get(bookId);
@@ -124,6 +138,17 @@ public final class FakeLending {
         } else {
             reply(exchange, 404, error(404, "RESOURCE_NOT_FOUND", "Unknown path " + path));
         }
+    }
+
+    /** The "sub" (username) inside a "Bearer <jwt>" header; the fake only reads it, it does not check the signature. */
+    private static String usernameOf(String authorization) {
+        if (authorization == null || !authorization.startsWith("Bearer ")) {
+            return "";
+        }
+        String payload = authorization.substring(7).split("\\.")[1];
+        String json = new String(Base64.getUrlDecoder().decode(payload), StandardCharsets.UTF_8);
+        Matcher matcher = Pattern.compile("\"sub\"\\s*:\\s*\"([^\"]+)\"").matcher(json);
+        return matcher.find() ? matcher.group(1) : "";
     }
 
     private static long number(String json, String field) {
