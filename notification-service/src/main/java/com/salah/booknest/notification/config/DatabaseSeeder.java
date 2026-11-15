@@ -28,8 +28,8 @@ public class DatabaseSeeder implements CommandLineRunner {
         }
         recipientRepository.save(new Recipient(1L, "librarian", "salah.dawood364@gmail.com"));
         recipientRepository.save(new Recipient(2L, "johnd", "202200240@student.polytechnic.bh"));
-        recipientRepository.save(new Recipient(3L, "janed", "jane.smith@yahoo.com"));
-        recipientRepository.save(new Recipient(4L, "alexm", "alex.miller@outlook.com"));
+        recipientRepository.save(new Recipient(3L, "janed", "janed@example.com"));
+        recipientRepository.save(new Recipient(4L, "alexm", "alexm@example.com"));
         log.info("Recipients successfully seeded!");
     }
 }

@@ -35,8 +35,8 @@ public class DatabaseSeeder implements CommandLineRunner {
         }
         seedUser("librarian", "Salah", "Dawood", "salah.dawood364@gmail.com", "librarian", "I am a librarian", 22);
         seedUser("johnd", "John", "Doe", "202200240@student.polytechnic.bh", "Member", "I LOVE BOOKS", randomAge());
-        seedUser("janed", "Jane", "Smith", "jane.smith@yahoo.com", "Member", "I LOVE BOOKS", randomAge());
-        seedUser("alexm", "Alex", "Miller", "alex.miller@outlook.com", "Member", "I LOVE BOOKS", randomAge());
+        seedUser("janed", "Jane", "Smith", "janed@example.com", "Member", "I LOVE BOOKS", randomAge());
+        seedUser("alexm", "Alex", "Miller", "alexm@example.com", "Member", "I LOVE BOOKS", randomAge());
         log.info("Users successfully seeded!");
     }
 
