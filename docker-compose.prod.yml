@@ -115,7 +115,8 @@ services:
       lending-service:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost/lb-health"]
+      # 127.0.0.1, not localhost: inside the container localhost is IPv6 first, and nginx listens on IPv4
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/lb-health"]
       interval: 10s
       retries: 6
 
