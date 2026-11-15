@@ -31,6 +31,15 @@ Feature: Talking to lending-service
     And the error is "SERVICE_UNAVAILABLE"
     And the catalogue has no book called "Dune"
 
+  Scenario: A lending-service that is too slow does not make the member wait
+    Given the librarian has added the book "Dune" with 3 copies
+    And I am logged in as the member "johnd"
+    And lending-service is too slow to answer
+    When I search the books for "dune"
+    Then the response status is 503
+    And the error is "SERVICE_UNAVAILABLE"
+    And the answer came within 3 seconds
+
   Scenario: The book list answers 503 while lending-service is down, and works again once it is back
     Given the librarian has added the book "Dune" with 3 copies
     And I am logged in as the member "johnd"

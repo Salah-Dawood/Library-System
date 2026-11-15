@@ -28,6 +28,7 @@ public class ApiClient {
 
     private int lastStatus;
     private String lastBody;
+    private double lastSeconds;
 
     public void send(String method, String path, String token, String json) {
         try {
@@ -39,7 +40,9 @@ public class ApiClient {
             builder.method(method, json == null
                     ? HttpRequest.BodyPublishers.noBody()
                     : HttpRequest.BodyPublishers.ofString(json));
+            long started = System.nanoTime();
             HttpResponse<String> response = client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+            lastSeconds = (System.nanoTime() - started) / 1e9;
             lastStatus = response.statusCode();
             lastBody = response.body();
         } catch (Exception e) {
@@ -53,6 +56,11 @@ public class ApiClient {
 
     public String lastBody() {
         return lastBody;
+    }
+
+    /** How long the last request took, in seconds. */
+    public double lastSeconds() {
+        return lastSeconds;
     }
 
     /** The last response body as JSON. */

@@ -14,6 +14,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -40,8 +41,11 @@ public final class FakeLending {
         }
     }
 
-    /** UP answers normally, DOWN drops every connection without an answer, BROKEN answers 500. */
-    public enum Mode { UP, DOWN, BROKEN }
+    /**
+     * UP answers normally, DOWN drops every connection without an answer, BROKEN answers 500,
+     * SLOW answers only after 3 seconds (longer than catalog-service's read timeout in the tests).
+     */
+    public enum Mode { UP, DOWN, BROKEN, SLOW }
 
     private volatile Mode mode = Mode.UP;
     private volatile String lastCaller;
@@ -59,6 +63,8 @@ public final class FakeLending {
             throw new UncheckedIOException(e);
         }
         server.createContext("/", this::handle);
+        // several threads, so a slow answer does not hold up the next requests
+        server.setExecutor(Executors.newCachedThreadPool());
         server.start();
     }
 
@@ -113,6 +119,13 @@ public final class FakeLending {
             // the connection is cut without any answer, as when the service has crashed
             exchange.close();
             return;
+        }
+        if (mode == Mode.SLOW) {
+            try {
+                Thread.sleep(3000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
         }
         if (mode == Mode.BROKEN) {
             reply(exchange, 500, error(500, "INTERNAL_ERROR", "An unexpected error occurred"));

@@ -15,6 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class LendingConnectionSteps {
 
     @Autowired private BookRepository bookRepository;
+    @Autowired private ApiClient api;
 
     @Given("lending-service is down")
     public void lendingIsDown() {
@@ -24,6 +25,16 @@ public class LendingConnectionSteps {
     @Given("lending-service fails with an internal error")
     public void lendingIsBroken() {
         FakeLending.INSTANCE.setMode(FakeLending.Mode.BROKEN);
+    }
+
+    @Given("lending-service is too slow to answer")
+    public void lendingIsSlow() {
+        FakeLending.INSTANCE.setMode(FakeLending.Mode.SLOW);
+    }
+
+    @Then("the answer came within {int} seconds")
+    public void answerCameWithin(int seconds) {
+        assertTrue(api.lastSeconds() < seconds, "the answer took " + api.lastSeconds() + " s");
     }
 
     @When("lending-service is back")
