@@ -56,7 +56,20 @@ public class UserService {
 
 
 
+    /** A visitor registers: a member who still has to verify their email. */
     public User createUser(RegisterRequest request){
+        return createAccount(request, "Member", false);
+    }
+
+    /**
+     * A librarian creates another librarian. The account is verified at once (a librarian vouches for it),
+     * and the starting password is the one the creating librarian chose.
+     */
+    public User createLibrarian(RegisterRequest request){
+        return createAccount(request, "librarian", true);
+    }
+
+    private User createAccount(RegisterRequest request, String role, boolean verified){
         if(userRepository.existsByUsername(request.getUsername())){
             throw new InformationExistException("User with username " + request.getUsername() + " already exists");
         } else if (userRepository.existsByEmailAddress(request.getEmailAddress())){
@@ -66,6 +79,8 @@ public class UserService {
             user.setUsername(request.getUsername());
             user.setEmailAddress(request.getEmailAddress());
             user.setPassword(passwordEncoder.encode(request.getPassword()));
+            user.setRole(role);
+            user.setIsVerified(verified);
 
             UserProfile profile = new UserProfile();
             profile.setUser(user);

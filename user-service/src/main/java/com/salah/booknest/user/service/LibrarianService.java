@@ -4,6 +4,7 @@ import com.salah.booknest.user.exception.InformationNotFoundException;
 import com.salah.booknest.user.exception.InvalidRequestException;
 import com.salah.booknest.user.exception.InvalidStateException;
 import com.salah.booknest.user.model.User;
+import com.salah.booknest.user.model.request.RegisterRequest;
 import com.salah.booknest.user.model.response.LoginResponse;
 import com.salah.booknest.user.model.response.UserDetailResponse;
 import com.salah.booknest.user.repository.UserRepository;
@@ -24,6 +25,12 @@ public class LibrarianService {
     private static final Set<String> SORTABLE_FIELDS = Set.of("id", "username", "emailAddress", "role", "createdAt");
 
     private final UserRepository userRepository;
+    private final UserService userService;
+
+    /** A new librarian account, verified at once; publishes UserRegistered like a normal registration. */
+    public UserDetailResponse createLibrarian(RegisterRequest request) {
+        return UserDetailResponse.from(userService.createLibrarian(request));
+    }
 
     @Transactional(readOnly = true)
     public UserDetailResponse getUserDetail(Long userId) {
