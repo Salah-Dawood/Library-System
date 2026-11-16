@@ -157,7 +157,24 @@ export async function usersPage(ctx) {
   ], "id");
   const dirBox = select("sortDir", [{ value: "asc", label: "Ascending" }, { value: "desc", label: "Descending" }], "asc");
   const form = h("form", { class: "toolbar", onsubmit: (e) => { e.preventDefault(); state.sortBy = sortBox.value; state.sortDir = dirBox.value; state.page = 0; load(); } },
-    field("Sort by", sortBox), field("Order", dirBox), h("button", { class: "btn", type: "submit" }, "Apply"));
+    field("Sort by", sortBox), field("Order", dirBox), h("button", { class: "btn", type: "submit" }, "Apply"),
+    h("button", { class: "btn secondary", type: "button", onclick: () => createLibrarian() }, "Create librarian"));
+
+  // a new librarian is verified at once and signs in with the starting password chosen here
+  function createLibrarian() {
+    formModal("Create librarian", "The new librarian can sign in straight away with this password.", [
+      field("Username", input("username", { required: true, minlength: "3", maxlength: "15", autocomplete: "off" }), "3 to 15 characters"),
+      field("Email", input("emailAddress", { type: "email", required: true, autocomplete: "off" })),
+      field("Starting password", input("password", { type: "password", required: true, minlength: "8", autocomplete: "new-password" }), "At least 8 characters. Ask them to change it after their first sign-in."),
+      field("First name", input("firstName", { required: true })),
+      field("Last name", input("lastName", { required: true })),
+      field("Age", input("age", { type: "number", min: "16", max: "100", required: true })),
+    ], "Create librarian", async (data) => {
+      const created = await API.createLibrarian({ ...data, age: data.age === "" ? null : Number(data.age) });
+      toast(created.username + " can now sign in as a librarian");
+      load();
+    });
+  }
 
   async function load() {
     replace(list, spinner());

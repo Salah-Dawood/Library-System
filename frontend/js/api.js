@@ -153,6 +153,7 @@ export const API = {
   // librarian
   users: (query) => get("/api/librarian/users", query),
   user: (id) => get("/api/librarian/users/" + id),
+  createLibrarian: (body) => api("POST", "/api/librarian/users", { body }),
   deactivateUser: (id) => put("/api/librarian/users/deactivate/" + id),
   activateUser: (id) => put("/api/librarian/users/activate/" + id),
   auditLog: (query) => get("/api/audit-log", query),
