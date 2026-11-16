@@ -115,9 +115,15 @@ function buildShell() {
     groups[r.group].append(h("a", { href: "#" + r.path, "data-path": r.path }, icon(r.icon), r.title));
   });
 
+  // the running release, filled in from the gateway; it changes by itself when Jenkins deploys a new version
+  const version = h("div", { class: "rail-version small muted" }, "");
+  API.info().then((info) => {
+    if (info && info.build && info.build.version) version.textContent = "BookNest v" + info.build.version;
+  }).catch(() => {});
+
   const rail = h("aside", { class: "rail" },
     h("a", { class: "brand", href: "#/books" }, h("span", { class: "brand-mark", "aria-hidden": "true" }, h("i"), h("i"), h("i"), h("i")), "BookNest"),
-    nav);
+    nav, version);
 
   const title = h("h1", null, "");
   const bellCount = h("span", { class: "dot-count", hidden: true }, "0");

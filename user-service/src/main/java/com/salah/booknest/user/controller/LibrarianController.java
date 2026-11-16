@@ -5,7 +5,13 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import com.salah.booknest.user.model.request.RegisterRequest;
 import com.salah.booknest.user.model.response.LoginResponse;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import com.salah.booknest.user.model.response.UserDetailResponse;
 import com.salah.booknest.user.service.LibrarianService;
 import lombok.RequiredArgsConstructor;
@@ -14,7 +20,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
-@Tag(name = "User administration", description = "Librarian only: list, inspect, activate, deactivate and delete users.")
+@Tag(name = "User administration", description = "Librarian only: create librarians, list, inspect, activate, deactivate and delete users.")
 @RestController
 @RequestMapping("/api/librarian")
 @PreAuthorize("hasRole('librarian')")
@@ -22,6 +28,19 @@ import org.springframework.web.bind.annotation.*;
 public class LibrarianController {
 
     private final LibrarianService librarianService;
+
+    @Operation(summary = "Create a librarian", description = "Creates a new librarian account with the starting password you choose. It is verified at once, so the new librarian can log in straight away. Librarian only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Librarian created"),
+            @ApiResponse(responseCode = "400", description = "Invalid details"),
+            @ApiResponse(responseCode = "409", description = "Username or email already registered")
+    })
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(content = @Content(mediaType = "application/json",
+            examples = @ExampleObject(value = "{\"username\":\"sara\",\"emailAddress\":\"sara@example.com\",\"password\":\"Passw0rd!\",\"firstName\":\"Sara\",\"lastName\":\"Ali\",\"age\":30}")))
+    @PostMapping("/users")
+    public ResponseEntity<UserDetailResponse> createLibrarian(@Valid @RequestBody RegisterRequest request) {
+        return new ResponseEntity<>(librarianService.createLibrarian(request), HttpStatus.CREATED);
+    }
 
     @Operation(summary = "Get a user with their profile", description = "Account details plus profile (name, age, bio, picture). Never includes the password or verification code. Librarian only.")
     @ApiResponses({

@@ -100,6 +100,15 @@ public class RoutingSteps {
         assertTrue(last.statusCode() >= 500, "status was " + last.statusCode() + ", body: " + last.body());
     }
 
+    @Then("the gateway reports the version of this build")
+    public void reportsVersion() {
+        assertEquals(200, last.statusCode(), "body: " + last.body());
+        JsonNode build = json().get("build");
+        assertTrue(build != null && build.hasNonNull("version"), "no build version in " + last.body());
+        // the version comes from the pom, written in by spring-boot-maven-plugin's build-info
+        assertTrue(build.get("version").asString().matches("\\d+\\.\\d+\\.\\d+"), "not a release number: " + build);
+    }
+
     @Then("the gateway reports {string}")
     public void gatewayReports(String status) {
         assertEquals(200, last.statusCode(), "body: " + last.body());

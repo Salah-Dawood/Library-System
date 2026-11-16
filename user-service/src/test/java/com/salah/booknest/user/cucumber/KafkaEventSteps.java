@@ -42,12 +42,14 @@ public class KafkaEventSteps {
                 .filter(u -> u.getUsername().equals(username)).findFirst()
                 .orElseThrow(() -> new AssertionError("no account " + username));
 
-        ConsumerRecord<String, String> record = readUntil(r -> json(r).get("username").asString().equals(username))
-                .stream().filter(r -> json(r).get("username").asString().equals(username)).findFirst()
+        // the topic keeps the events of earlier scenarios too, which may have had an account with the same name,
+        // so the event must belong to this scenario's account (its id)
+        Predicate<ConsumerRecord<String, String>> thisAccount = r -> json(r).get("username").asString().equals(username)
+                && json(r).get("userId").asLong() == user.getId();
+        ConsumerRecord<String, String> record = readUntil(thisAccount).stream().filter(thisAccount).findFirst()
                 .orElseThrow(() -> new AssertionError("no UserRegistered event for " + username));
 
         JsonNode event = json(record);
-        assertEquals(user.getId(), event.get("userId").asLong());
         assertEquals(email, event.get("email").asString());
         assertTrue(event.hasNonNull("eventId") && !event.get("eventId").asString().isBlank(), "the event has no eventId");
         assertTrue(event.hasNonNull("occurredAt"), "the event has no occurredAt");
