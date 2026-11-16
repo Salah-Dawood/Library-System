@@ -165,11 +165,53 @@ services:
       frontend:
         condition: service_started
 
+  # a web page to look inside the RDS database, next to the services (RDS itself stays private).
+  # Off by default, so deploys never start it:
+  #   start: docker compose -f docker-compose.prod.yml --profile admin up -d pgadmin
+  #   stop:  docker compose -f docker-compose.prod.yml --profile admin stop pgadmin
+  # Open http://<server-ip>:5050; the server's security group lets only your IP in on 5050.
+  pgadmin:
+    <<: *cloudwatch
+    image: dpage/pgadmin4:9
+    profiles: ["admin"]
+    restart: "no"
+    mem_limit: 384m
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+      # the BookNest RDS database is already in the list
+      PGADMIN_SERVER_JSON_FILE: /pgadmin4/servers.json
+    configs:
+      - source: pgadmin-servers
+        target: /pgadmin4/servers.json
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+
 volumes:
   kafka-data:
   profile-images:
+  pgadmin-data:
 
 configs:
+  # the RDS database in pgAdmin's list (DB_HOST comes from the server's .env); the password is asked on connect
+  pgadmin-servers:
+    content: |
+      {
+        "Servers": {
+          "1": {
+            "Name": "BookNest RDS (AWS)",
+            "Group": "Servers",
+            "Host": "${DB_HOST}",
+            "Port": 5432,
+            "MaintenanceDB": "booknest",
+            "Username": "postgres",
+            "SSLMode": "require"
+          }
+        }
+      }
+
   # nginx settings of lending-lb ($$ is a single $ for nginx; compose would read $ as one of its own variables)
   lending-lb:
     content: |
