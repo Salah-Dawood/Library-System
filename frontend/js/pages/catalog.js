@@ -67,13 +67,38 @@ export async function booksPage(ctx) {
     } catch (error) { replace(results, h("div", { class: "panel" }, empty("Could not load books", error.message))); }
   }
 
+  // the books are split into rows that fit the width, each row standing on its own board,
+  // so a row never floats above the next one; the rows are worked out again when the width changes
   function shelf(page) {
+    const rows = h("div", { class: "shelf-rows", role: "list" });
+    let layout = "";
+    function arrange() {
+      const usable = rows.clientWidth - 44; // the shelf's padding: 22px on each side
+      const lines = [[]];
+      let used = 0;
+      for (const book of page.content) {
+        const width = spineStyle(book).width + 3; // the spine and the gap after it
+        if (usable > 0 && used + width > usable && lines[lines.length - 1].length) {
+          lines.push([]);
+          used = 0;
+        }
+        lines[lines.length - 1].push(book);
+        used += width;
+      }
+      const next = lines.map((line) => line.length).join(",");
+      if (next === layout) return; // same rows as before, nothing to redraw
+      layout = next;
+      replace(rows, ...lines.map((line) => h("div", { class: "shelf-row", role: "none" },
+        h("div", { class: "shelf", role: "none" }, line.map(spine)),
+        h("div", { class: "shelf-board" }))));
+    }
+    new ResizeObserver(arrange).observe(rows);
+    arrange();
     return h("div", null,
       h("div", { class: "shelf-legend" },
         h("span", null, h("i"), "Copy on the shelf"), h("span", null, h("i", { class: "out" }), "Copy out on loan"),
         h("span", null, "Select a spine to open the book")),
-      h("div", { class: "shelf", role: "list" }, page.content.map(spine)),
-      h("div", { class: "shelf-board" }),
+      rows,
       pager(page, (p) => { state.page = p; load(); }));
   }
 
