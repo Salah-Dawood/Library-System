@@ -89,6 +89,8 @@ export const API = {
   // authentication
   register: (body) => api("POST", "/auth/users/register", { body, auth: false }),
   login: (body) => api("POST", "/auth/users/login", { body, auth: false }),
+  // the release the server runs, from the gateway ({ build: { version } })
+  info: () => api("GET", "/actuator/info", { auth: false }),
   resetPassword: (token, newPassword) => api("PUT", "/auth/users/passwordreset/" + encodeURIComponent(token), { body: { newPassword }, auth: false }),
   sendVerification: (username) => api("PUT", "/auth/email/getverification/" + encodeURIComponent(username), { auth: false }),
   verifyEmail: (username, code) => api("PUT", "/auth/email/verify/" + encodeURIComponent(username), { query: { code }, auth: false }),
