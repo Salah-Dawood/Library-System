@@ -26,8 +26,8 @@ public class DatabaseSeeder implements CommandLineRunner {
             log.info("Recipients already exist. Skipping seeding.");
             return;
         }
-        recipientRepository.save(new Recipient(1L, "librarian", "salah.dawood364@gmail.com"));
-        recipientRepository.save(new Recipient(2L, "johnd", "202200240@student.polytechnic.bh"));
+        recipientRepository.save(new Recipient(1L, "librarian", "librarian@example.com"));
+        recipientRepository.save(new Recipient(2L, "johnd", "johnd@example.com"));
         recipientRepository.save(new Recipient(3L, "janed", "janed@example.com"));
         recipientRepository.save(new Recipient(4L, "alexm", "alexm@example.com"));
         log.info("Recipients successfully seeded!");
