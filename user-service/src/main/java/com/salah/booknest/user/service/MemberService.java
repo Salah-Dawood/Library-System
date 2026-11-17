@@ -84,7 +84,7 @@ public class MemberService {
         return new MessageResponse("Profile updated successfully");
     }
 
-    //used to upload image and return URL
+    // saves the uploaded picture and returns the address it is served from
     public String uploadImage(MultipartFile image){
         if (image.isEmpty()) {
             throw new InvalidRequestException("Image file is empty");

@@ -95,7 +95,6 @@ public class EmailVerificationService {
         sendEmail(email, subject, htmlContent);
     }
 
-    //generate code helper method
     public int generateVerificationCode() {
         // Generates a number from 0 to 8999, then adds 1000 to ensure it's always 4 digits
         return 1000 + SECURE_RANDOM.nextInt(9000);

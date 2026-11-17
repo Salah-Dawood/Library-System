@@ -5,7 +5,8 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 @Getter
-@AllArgsConstructor//just for race demo
+// the race demo builds requests in code
+@AllArgsConstructor
 public class LoanRequest {
 
     @NotNull

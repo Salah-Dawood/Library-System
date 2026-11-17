@@ -83,8 +83,6 @@ public class LoanService {
         return loanRepository.findAllByUserId(userId, pageable).map(LoanResponse::from);
     }
 
-    //workflow
-
     /**
      * Borrows a book on the spot for the logged-in member, with no approval step.
      * One copy is taken out of stock right away, the loan date is today and the due date is today
@@ -318,7 +316,6 @@ public class LoanService {
         return loanRepository.existsByUserIdAndBookIdAndStatusIn(userId, bookId, List.of(LoanStatus.RETURNED));
     }
 
-    //count return status
     /**
      * Summarises how a user returns books: counts of early, on-time and late returns and the
      * percentage returned on time or early. The reliable badge needs at least 3 returns and 90% or more on time.

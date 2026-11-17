@@ -25,16 +25,19 @@ public class AuditLog {
     private String type;
 
     @Column(nullable = false)
-    private Long userId;//instigator
+    // who did it (0 = the system, for example a scheduled job)
+    private Long userId;
 
     @Column(nullable = false)
-    private String action;//what happened ->
+    // what happened, for example BORROWED
+    private String action;
 
     @Column(nullable = false)
-    private Long whatId;// -> to what/who
+    // id of the loan, fine or waitlist entry it happened to
+    private Long whatId;
 
     @Column(nullable = false)
-    private LocalDateTime timestamp; // when it happened
+    private LocalDateTime timestamp;
 
     @PrePersist
     public void prePersist() {
