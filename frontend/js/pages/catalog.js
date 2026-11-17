@@ -15,6 +15,10 @@ export async function booksPage(ctx) {
   const state = { title: "", genre: "", sortBy: "title", sortDir: "asc", page: 0, view: "shelf" };
   const genres = await API.genres().catch(() => []);
   const results = h("div");
+  // watches the shelf's width; stopped when the books are loaded again and when the page is left
+  let shelfObserver = null;
+  const stopShelf = () => { if (shelfObserver) { shelfObserver.disconnect(); shelfObserver = null; } };
+  ctx.onCleanup(stopShelf);
 
   const titleBox = input("title", { type: "search", placeholder: "Search by title" });
   const genreBox = select("genre", [{ value: "", label: "All genres" }, ...genres.map((g) => ({ value: g.name, label: g.name }))], "");
@@ -56,6 +60,7 @@ export async function booksPage(ctx) {
   }
 
   async function load() {
+    stopShelf();
     replace(results, spinner());
     try {
       const page = await API.books({
@@ -92,7 +97,8 @@ export async function booksPage(ctx) {
         h("div", { class: "shelf", role: "none" }, line.map(spine)),
         h("div", { class: "shelf-board" }))));
     }
-    new ResizeObserver(arrange).observe(rows);
+    shelfObserver = new ResizeObserver(arrange);
+    shelfObserver.observe(rows);
     arrange();
     return h("div", null,
       h("div", { class: "shelf-legend" },
