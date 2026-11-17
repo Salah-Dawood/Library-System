@@ -288,15 +288,17 @@ The log group `/booknest/prod` was created in `us-east-1`. Every container in `d
 
 ### EventBridge Scheduler
 
-Four schedules, all using `booknest-scheduler-role` and the same time zone. The database starts well before the
-server and stops after it:
+Four schedules, all using `booknest-scheduler-role` and the time zone UTC+3. The database starts 30 minutes
+before the server, so it is ready when the services connect, and stops 10 minutes after it:
 
-| Schedule | Action | Example time |
-|---|---|---|
-| `booknest-db-start` | RDS `StartDBInstance` `{"DbInstanceIdentifier": "booknest-db"}` | morning |
-| `booknest-server-start` | EC2 `StartInstances` `{"InstanceIds": ["i-..."]}` | 30 minutes later |
-| `booknest-server-stop` | EC2 `StopInstances` | 23:00 |
-| `booknest-db-stop` | RDS `StopDBInstance` | 23:10 |
+| Schedule | Action | Time (UTC+3) | Cron |
+|---|---|---|---|
+| `booknest-db-start` | RDS `StartDBInstance` `{"DbInstanceIdentifier": "booknest-db"}` | 08:30 | `30 8 * * ? *` |
+| `booknest-server-start` | EC2 `StartInstances` `{"InstanceIds": ["i-..."]}` | 09:00 | `0 9 * * ? *` |
+| `booknest-server-stop` | EC2 `StopInstances` | 18:00 | `0 18 * * ? *` |
+| `booknest-db-stop` | RDS `StopDBInstance` | 18:10 | `10 18 * * ? *` |
+
+So the site is online every day from 09:00 to 18:00 (UTC+3).
 
 ![The four start and stop schedules](images/eventbridge-schedules.png)
 
