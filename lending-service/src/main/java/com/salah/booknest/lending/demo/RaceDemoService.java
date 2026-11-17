@@ -1,6 +1,5 @@
 package com.salah.booknest.lending.demo;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.salah.booknest.lending.exception.InformationNotFoundException;
 import com.salah.booknest.lending.exception.InvalidStateException;
 import com.salah.booknest.lending.model.Inventory;
@@ -27,7 +26,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;

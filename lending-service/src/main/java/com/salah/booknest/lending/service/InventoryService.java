@@ -1,7 +1,6 @@
 package com.salah.booknest.lending.service;
 
 import com.salah.booknest.lending.exception.InformationExistException;
-import com.salah.booknest.lending.exception.InformationNotFoundException;
 import com.salah.booknest.lending.exception.InvalidRequestException;
 import com.salah.booknest.lending.exception.InvalidStateException;
 import com.salah.booknest.lending.model.Inventory;
