@@ -136,7 +136,6 @@ export const API = {
   // waitlist
   joinWaitlist: (bookId) => post("/api/waitlist", { bookId }),
   myWaitlist: () => get("/api/waitlist/my"),
-  waitlistEntry: (id) => get("/api/waitlist/" + id),
   leaveWaitlist: (id) => del("/api/waitlist/" + id),
   claimHold: (id, days) => post("/api/waitlist/" + id + "/claim", undefined, { days }),
   bookQueue: (bookId) => get("/api/waitlist/book/" + bookId),

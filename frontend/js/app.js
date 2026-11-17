@@ -90,7 +90,6 @@ async function route() {
     query, params, navigate,
     onLive: (fn) => liveHandlers.push(fn),
     onCleanup: (fn) => cleanups.push(fn),
-    setTitle: (text) => { shell.title.textContent = text; },
   };
   try {
     const node = await entry.page(ctx);
