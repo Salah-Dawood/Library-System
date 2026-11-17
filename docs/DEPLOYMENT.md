@@ -211,6 +211,10 @@ Everything is in region `us-east-1`. These steps were done once, in the AWS cons
 
 The server gets its AWS permissions from its role, so no AWS access keys exist anywhere, on the server or in the code.
 
+![The admin user booknest-admin, in one group, with MFA](images/iam-admin.png)
+
+![The two roles: booknest-ec2-role for the server, booknest-scheduler-role for the scheduler](images/iam-roles.png)
+
 ### RDS (database)
 
 | Setting | Value |
@@ -219,7 +223,7 @@ The server gets its AWS permissions from its role, so no AWS access keys exist a
 | Identifier | `booknest-db` |
 | Class / storage | `db.t3.micro`, 20 GB gp3, storage autoscaling off |
 | Public access | No |
-| Security group | `booknest-db-sg`: PostgreSQL 5432 only from the security group `booknest-server-sg` |
+| Security group | `booknest-db-sg`: PostgreSQL 5432 only from the server's security group |
 
 The `booknest` database was created once from the server (RDS cannot be reached from anywhere else):
 
@@ -228,6 +232,10 @@ docker run --rm -it postgres:17 psql "host=<rds-endpoint> port=5432 user=postgre
 ```
 
 The services create their tables on first start.
+
+![RDS connectivity: private endpoint, security group booknest-db-sg, publicly accessible No](images/rds-DB.png)
+
+![booknest-db-sg allows PostgreSQL only from the server's security group](images/db-sg.png)
 
 ### EC2 (server)
 
@@ -241,13 +249,18 @@ The services create their tables on first start.
 | IAM role | `booknest-ec2-role` |
 | Address | an Elastic IP, so it stays the same after every stop and start |
 
-Security group `booknest-server-sg`, inbound:
+The server's security group, inbound:
 
 | Port | Source | Why |
 |---|---|---|
 | 80 (HTTP) | anywhere | the site |
 | 22 (SSH) | my IP only | administration and the Jenkins deploy |
+| 22 (SSH) | AWS's EC2 Instance Connect range for us-east-1 | logging in from the browser, in the AWS console |
 | 5050 | my IP only | pgAdmin, only when it is started |
+
+![The server: m7i-flex.large, running, with its Elastic IP and the role booknest-ec2-role](images/ec2-instance.png)
+
+![The server's inbound rules](images/ec2-sg.png)
 
 Docker was installed by the instance's user data on first boot:
 
@@ -271,6 +284,8 @@ The server's settings live in `~/booknest/.env` on the server only (template: [.
 The log group `/booknest/prod` was created in `us-east-1`. Every container in `docker-compose.prod.yml` uses the
 `awslogs` driver, with one stream per container. See [MONITORING.md](MONITORING.md).
 
+![One log stream per container in /booknest/prod](images/cloudwatch-streams.png)
+
 ### EventBridge Scheduler
 
 Four schedules, all using `booknest-scheduler-role` and the same time zone. The database starts well before the
@@ -283,12 +298,14 @@ server and stops after it:
 | `booknest-server-stop` | EC2 `StopInstances` | 23:00 |
 | `booknest-db-stop` | RDS `StopDBInstance` | 23:10 |
 
+![The four start and stop schedules](images/eventbridge-schedules.png)
+
 The containers use `restart: unless-stopped`, so they come back by themselves when the server starts.
 
 ### Security summary
 
 * RDS is private and accepts only the server's security group; it is never open to the internet.
-* Only port 80 is public; SSH and pgAdmin are limited to one IP address.
+* Only port 80 is public; SSH and pgAdmin are limited to one IP address (plus AWS's own range for EC2 Instance Connect).
 * Secrets (database password, JWT secret, email password) exist only in the server's `.env` and in Jenkins
   credentials, never in Git. `.env` is in `.gitignore`.
 * No AWS access keys: the server uses an IAM role, the scheduler uses a role limited to start/stop of two resources.
@@ -342,6 +359,8 @@ The Deploy stage:
 To release a new version: change the version in the poms (for example `1.1.0` → `1.2.0`), merge to `main`, and
 Jenkins builds, tests, pushes and deploys it.
 
+![A green build of main, through Deploy](images/jenkins-pipeline.png)
+
 ### Manual (on the server)
 
 ```bash
@@ -377,8 +396,12 @@ Open `http://<elastic-ip>:5050` (allowed only from my IP); the RDS database is a
    docker compose -f docker-compose.prod.yml ps
    ```
 
+   ![Every container healthy on the server, running the images of build 1.1.0-6ceaf21](images/docker-ps.png)
+
 3. The site opens at `http://<elastic-ip>` and the version at the bottom of the side menu is the new one; the
    same version is at `http://<elastic-ip>/actuator/info`. `http://<elastic-ip>/actuator/health` answers `UP`.
+
+   ![The version in the side menu of the live site](images/site-version.png)
 4. Log in, borrow and return a book; the live notification and the email arrive (this checks Kafka and
    notification-service).
 5. Both lending instances answer: the `X-Lending-Instance` header of `/api/loans/...` replies alternates between two addresses.
@@ -387,5 +410,7 @@ Open `http://<elastic-ip>:5050` (allowed only from my IP); the RDS database is a
    ```bash
    python3 scripts/race-test.py --url http://<elastic-ip>
    ```
+
+   ![The race test on the server: 1 of 30 borrows succeeded, both instances answered](images/race-test.png)
 
 7. CloudWatch Logs shows fresh log streams in `/booknest/prod` for every container (see [MONITORING.md](MONITORING.md)).

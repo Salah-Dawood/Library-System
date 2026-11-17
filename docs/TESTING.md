@@ -109,5 +109,7 @@ On the server itself, `--url` can be left out (it defaults to http://localhost).
 asked for, or read from `BOOKNEST_PASSWORD`. It prints which instance answered each request (the `X-Lending-Instance` header
 set by `lending-lb`), so the result shows that the rule held across both instances.
 
+![The race test on the server: 1 of 30 borrows succeeded, 15 requests answered by each instance](images/race-test.png)
+
 After a deploy, Jenkins also checks the containerized application: `docker compose up --wait` fails the build if
 any container does not become healthy, and the site must answer from outside (see [DEPLOYMENT.md](DEPLOYMENT.md)).

@@ -78,6 +78,8 @@ Every container in `docker-compose.prod.yml` uses Docker's `awslogs` log driver:
 * the server writes with its IAM role `booknest-ec2-role`, so there are no AWS keys on the server;
 * `mode: non-blocking`: if CloudWatch cannot be reached, log lines wait in a 4 MB buffer instead of slowing the service down.
 
+![One log stream per container, including both lending-service copies](images/cloudwatch-streams.png)
+
 ### Reading the logs
 
 * **Log streams:** CloudWatch, then Log groups, then `/booknest/prod`, then a stream: one container's log.

@@ -8,6 +8,8 @@ deployed by Jenkins, and run on AWS (EC2 + RDS) with logs in CloudWatch.
 
 Current version: 1.1.0 (shown at the bottom of the side menu of the site, and on `/actuator/info`).
 
+![The version in the side menu](docs/images/site-version.png)
+
 | Document | What is in it |
 |---|---|
 | [docs/SERVICES.md](docs/SERVICES.md) | every service: responsibility, APIs, data, how it talks to the others |
