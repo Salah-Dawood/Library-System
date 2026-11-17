@@ -22,21 +22,18 @@ public class GenreService {
     }
 
 
-    //return all genres
     public List<GenreResponse> getGenres(){
         return genreRepository.findAll().stream()
                 .map(GenreResponse::from)
                 .toList();
     }
 
-    //return genre
     public GenreResponse getGenre(String name){
         Genre genre = genreRepository.findByName(name)
                 .orElseThrow(() -> new InformationNotFoundException("genre with name " + name + " not found"));
         return GenreResponse.from(genre);
     }
 
-    //create genre
     public GenreResponse createGenre(GenreRequest request){
         genreRepository.findByName(request.getName())
                 .ifPresent(existingGenre -> {

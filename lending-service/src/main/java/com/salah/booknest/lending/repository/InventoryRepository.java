@@ -11,7 +11,7 @@ import java.util.Optional;
 
 public interface InventoryRepository extends JpaRepository<Inventory, Long> {
 
-    //prevent double booking
+    // SELECT ... FOR UPDATE: a second borrow of the same book waits here, so the last copy is never lent twice
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<Inventory> findWithLockByBookId(Long bookId);
 

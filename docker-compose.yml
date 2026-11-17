@@ -74,6 +74,7 @@ services:
       EMAIL_PASSWORD: ${EMAIL_PASSWORD}
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       PUBLIC_URL: ${PUBLIC_URL:-http://localhost:8080}
+      SEED_PASSWORD: ${SEED_PASSWORD}
     volumes:
       - profile-images:/app/profile
     depends_on:

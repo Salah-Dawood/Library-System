@@ -137,6 +137,7 @@ Fill in `.env`:
 | `JWT_SECRET` | a long random Base64 string, at least 32 characters; shared by every service |
 | `EMAIL_USERNAME`, `EMAIL_PASSWORD` | a Gmail address and an app password, for the emails |
 | `PUBLIC_URL` | optional, the address used in email links (default `http://localhost:8080`) |
+| `SEED_PASSWORD` | password of the sample accounts created on the first start |
 | `PGADMIN_EMAIL`, `PGADMIN_PASSWORD` | login for pgAdmin |
 
 Then:
@@ -155,7 +156,8 @@ docker compose up --build
 The services start in order: PostgreSQL and Kafka first, then the services once they are healthy, then the
 gateway. They reach each other by service name on the Compose network (`http://lending-service:8083`,
 `kafka:29092`, `postgres:5432`), never `localhost`. On the first start each service creates its tables and
-seeds sample data: books, a librarian `librarian` and some members.
+seeds sample data: books, a librarian `librarian` and the members `johnd`, `janed` and `alexm`, all with the
+password from `SEED_PASSWORD`.
 
 Stop with `docker compose down` (add `-v` to also delete the database).
 
@@ -277,7 +279,7 @@ mkdir -p /home/ec2-user/booknest && chown ec2-user /home/ec2-user/booknest
 
 The server's settings live in `~/booknest/.env` on the server only (template: [.env.prod.example](../.env.prod.example)):
 `DB_HOST` (the RDS endpoint), `DB_PASSWORD`, `JWT_SECRET`, the email keys, `PUBLIC_URL`, `DOCKERHUB_USER`,
-`AWS_REGION`, the pgAdmin login, and `VERSION` (written by Jenkins on each deploy).
+`AWS_REGION`, the pgAdmin login, `SEED_PASSWORD` (only used on an empty database), and `VERSION` (written by Jenkins on each deploy).
 
 ### CloudWatch Logs
 

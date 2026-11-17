@@ -53,7 +53,7 @@ public class JWTUtils {
     private static final String PURPOSE_CLAIM = "purpose";
     private static final String RESET_PURPOSE = "password-reset";
 
-    //verify if passwordtoken valid
+    // true only for tokens made for a password reset, so a login token cannot reset a password
     public boolean isPasswordResetToken(String token) {
         Claims claims = Jwts.parserBuilder().setSigningKey(jwtSecret).build().parseClaimsJws(token).getBody();
         return RESET_PURPOSE.equals(claims.get(PURPOSE_CLAIM));

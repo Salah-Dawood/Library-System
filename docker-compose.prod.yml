@@ -63,6 +63,8 @@ services:
       EMAIL_USERNAME: ${EMAIL_USERNAME}
       EMAIL_PASSWORD: ${EMAIL_PASSWORD}
       PUBLIC_URL: ${PUBLIC_URL}
+      # only used if the users table is empty (a new database)
+      SEED_PASSWORD: ${SEED_PASSWORD:-}
     volumes:
       - profile-images:/app/profile
     depends_on:

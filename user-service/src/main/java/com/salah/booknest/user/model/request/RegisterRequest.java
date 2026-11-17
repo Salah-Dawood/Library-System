@@ -1,7 +1,5 @@
 package com.salah.booknest.user.model.request;
 
-import com.salah.booknest.user.model.UserProfile;
-import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;

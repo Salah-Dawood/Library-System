@@ -112,7 +112,8 @@ Fill in `.env` (database password, JWT secret, the Gmail address and app passwor
 docker compose up --build
 ```
 
-Open http://localhost:8080. The first start seeds sample books, a librarian (`librarian`) and members.
+Open http://localhost:8080. The first start seeds sample books, a librarian (`librarian`) and members
+(`johnd`, `janed`, `alexm`), all with the password you set as `SEED_PASSWORD`.
 pgAdmin is on http://localhost:5050.
 
 To run a service from IntelliJ instead, start only what it needs with

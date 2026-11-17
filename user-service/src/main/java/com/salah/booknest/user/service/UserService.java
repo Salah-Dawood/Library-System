@@ -120,7 +120,6 @@ public class UserService {
             throw new UserNotVerifiedException("Please verify your email before logging in.");
         }
 
-        //generate jwt
         final String jwt = jwtUtils.generateJwtToken(principalDetails);
 
         // create user summary for front end
