@@ -56,6 +56,12 @@ Each service reads and writes only the tables it owns; nothing joins across serv
 | lending-service | `inventory`, `loans`, `waitlist_entries`, `fines`, `members`, `audit_logs`, `shedlock` | catalog asks for copy counts and returned loans over REST; notification gets events |
 | notification-service | `recipients`, `processed_events` | nothing, it only receives |
 
+![Entity relationship diagram of the booknest database](images/erd.png)
+
+Lines between tables of the same service are real foreign keys or ids matched by the code. Ids that point into
+another service's data (for example `loans.user_id`, `reviews.user_id`, `inventory.book_id`) are plain columns
+with no foreign key, so each service's tables stand on their own.
+
 Where a service needs data it does not own, it keeps a small copy of what it needs instead of reading the other
 service's tables:
 
