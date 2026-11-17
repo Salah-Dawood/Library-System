@@ -1,394 +1,198 @@
 # BookNest
-is a streamlined library management platform designed to simplify the book loaning process.
-The system bridges the gap between readers and library administrators by replacing manual tracking with a digital workflow that manages borrowing requests in real-time.
 
-> **Project 3 update:** borrowing is now instant with a reviewed return, plus a waitlist, thread pools and race-condition handling. [Jump to the Project 3 Update](#project-3-multithreading-and-thread-safety-update)
+BookNest is a library platform: members browse the catalogue, borrow books, join waitlists and review
+what they read; librarians manage the books, review returns, handle fines and manage accounts.
+
+It is built as microservices that talk over REST and Kafka, run in Docker, are built, tested and
+deployed by Jenkins, and run on AWS (EC2 + RDS) with logs in CloudWatch.
+
+Current version: 1.1.0 (shown at the bottom of the side menu of the site, and on `/actuator/info`).
+
+![The version in the side menu](docs/images/site-version.png)
+
+| Document | What is in it |
+|---|---|
+| [docs/SERVICES.md](docs/SERVICES.md) | every service: responsibility, APIs, data, how it talks to the others |
+| [docs/KAFKA.md](docs/KAFKA.md) | topics, events, producers and consumers, reliability |
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | build, run locally, CI/CD, AWS setup and deployment |
+| [docs/MONITORING.md](docs/MONITORING.md) | logs, health checks, CloudWatch |
+| [docs/TESTING.md](docs/TESTING.md) | the Cucumber test suites and the race test |
 
 
 ## Main features
 
-### Authentication & Profile Management
-* **User Authentication:** Secure user registration and login systems with role-based access control (Member vs. Librarian).
-* **Password Recovery:** Self-service password reset workflow utilizing secure, time-sensitive email verification links.
-* **Profile Customization:** Users can dynamically update their personal account information and contact details.
-* **Profile Pictures:** Dedicated profile picture support allowing users to upload and change their profile photos.
+**Members**
+* Register, verify the email with a code, log in, reset a forgotten password by email.
+* Edit the profile and upload a profile picture.
+* Browse and search the catalogue by title, author and genre.
+* Borrow a book instantly (up to 5 at a time), return it, see the loan history and return record.
+* Join the waitlist of a book with no free copies; the next returned copy is held for 24 hours for the first in line.
+* Review books they have returned, pay fines.
+* Live notifications in the browser and emails (loan events, holds, due tomorrow).
 
-### Request-Based Borrowing System
-* **Borrow Requests:** Members browse the catalog and submit formal requests to borrow books.
-* **Librarian Approval Queue:** An administrative dashboard where librarians review, accept, or reject pending requests.
-* **Automatic Inventory Tracking:** System dynamically updates a book's availability status the moment a request is approved.
+**Librarians**
+* Manage books, authors and genres; set the number of copies.
+* Review returned books for damage and add damage fines (late fines are automatic).
+* See all loans, fines, waitlists and the audit log.
+* Activate and deactivate accounts, and create other librarian accounts (new in 1.1.0).
+* The Race lab page shows what happens when many members borrow the last copy at once.
 
-### Live Alerts & Communications
-* **Live Notifications:** Real-time, instant in-app alerts that notify readers immediately when a librarian updates their request status.
-* **Email Notifications:** Automated transactional emails sent to users for account password recovery and email verification upon registration.
 
-### Returns, Reviews & History
-* **Punctuality Tracking:** System logs whether a book was returned **On Time**, **Early**, or **Late** relative to its due date.
-* **Member Return Records:** Maintains a history of return habits on each member's profile for administrative review.
-* **Book Reviews:** Readers can leave ratings and feedback directly inside the system upon returning a borrowed book.
-* **Return Processing:** Smooth workflow for checking books back into the active library inventory.
+## Architecture
 
-### System Security & Transparency
-* **Audit Logs:** Comprehensive, chronological logs tracking system activity, request history, and administrative decisions for security.
+```mermaid
+flowchart TB
+    browser([Browser]) --> gateway[api-gateway]
+
+    gateway --> frontend[frontend]
+    gateway --> user[user-service]
+    gateway --> catalog[catalog-service]
+    gateway --> lending[lending-service<br/>2 copies on AWS]
+    gateway --> notification[notification-service]
+
+    user -->|events| kafka[(Kafka)]
+    lending -->|events| kafka
+    kafka --> notification
+
+    user & catalog & lending & notification --> db[(PostgreSQL)]
+```
+
+* The browser only talks to api-gateway. It serves the pages of the frontend service and sends each
+  `/api` and `/auth` call to the service that owns it.
+* **Synchronous (REST):** browser → gateway → services, and catalog-service → lending-service
+  (copy counts on the book pages, and whether a member returned a book before reviewing it).
+* **Asynchronous (Kafka):** user-service and lending-service publish events; notification-service consumes
+  them and sends the email and the live notification. Borrowing never waits for an email.
+* All services use one PostgreSQL database `booknest`, but each service reads and writes only its own
+  tables; anything else it needs comes through an API or an event.
+* On AWS, two copies of lending-service run behind the nginx load balancer `lending-lb`, to show
+  that the concurrency rules hold across instances. Locally there is one copy.
+
+| Service | Port | Owns |
+|---|---|---|
+| api-gateway | 8080 (80 on AWS) | routing, the only public entrance |
+| user-service | 8081 | accounts, login (JWT), email verification, password reset, profiles |
+| catalog-service | 8082 | books, authors, genres, reviews |
+| lending-service | 8083 | copies (stock), loans, waitlist and holds, fines, audit log, reminders |
+| notification-service | 8084 | emails and live notifications (SSE) from Kafka events |
+| frontend | 3000 (inside: 80) | the web pages (nginx) |
+| Kafka | 9092 | events between services |
+| PostgreSQL | 5433 locally | the `booknest` database (RDS on AWS) |
 
 
 ## Technologies
 
-### Backend Framework & Core
-* **Java:** Core programming language.
-* **Spring Boot:** Main application framework.
-* **Maven / Gradle:** Build automation and dependency management tool.
-* **Lombok:** Used to reduce boilerplate code (Getters, Setters, Builders) via annotations.
-
-### Security & Performance
-* **Spring Security:** Framework for robust authentication and role-based access control.
-* **JSON Web Tokens (JWT):** Secured stateless session management.
-* **Bucket4j:** API rate-limiting library implementation to prevent brute-force attacks and abuse.
-* **Caffeine Cache:** In-memory caching engine used to support rate-limiting and cache application data.
-
-### Database & Persistence
-* **Spring Data JPA:** Abstracted data access layer utilizing Hibernate as the ORM provider.
-* **PostgreSQL:** Reliable relational database used for production data storage.
-
-### Communications & Templates
-* **Spring Boot Starter Mail:** Core email infrastructure layer.
-* **Mailtrap Java SDK:** Used as the secure email sending transport service and testing environment.
-* **Thymeleaf:** Server-side Java template engine used to dynamically render HTML email templates.
-
-### Live Connections & API Documentation
-* **Server-Sent Events (SSE):** Utilized for pushing real-time request status updates to clients.
-* **Springdoc OpenAPI / Swagger UI:** Automatically generated, interactive REST API documentation interface.
-
-
-## Architecture
-## System Architecture
-
-The backend application follows a standard **layered architecture** design pattern to separate concerns, ensure maintainability, and enforce loose coupling. Request data flows linearly through the following layers:
-
-### Supporting Components & Modules
-
-* **Security Layer**
-  * Implemented using **Spring Security** and stateless **JWT** interceptors.
-  * Intercepts incoming requests to perform authentication, validate tokens, and enforce role-based authorization (Member vs. Librarian).
-  * Integrates **Bucket4j** and **Caffeine Cache** directly into filter chains to enforce rate-limiting constraints per API user.
-
-* **Data Transfer Objects (DTOs)**
-  * Lightweight objects used to decouple internal database entities from external API payloads.
-  * Prevents input into database that are not meant to be entered by users such as create/update time stamps
-  * Prevents the exposure of sensitive database fields (like password hashes or auto-incremented keys) over public networks.
-
-
-* **Exception Handling (`@RestControllerAdvice`)**
-  * A centralized global exception handler that captures errors thrown anywhere within the application stack.
-  * Translates custom errors (e.g., `BookNotAvailableException`, `InvalidTokenException`) into uniform, client-friendly JSON error structures containing consistent timestamps and status codes.
-
-* **Server-Sent Events (SSE Functionality)**
-  * Provides a lightweight, one-way asynchronous streaming connection between the server and the frontend client.
-  * Enables the backend to immediately push live, real-time request status updates (in this case from REQUESTED to APPROVED) to the member's browser without requiring continuous polling.
-
-* **Configuration Layer (`@Configuration`)**
-  * Centralizes all Java-based system configurations.
-  * Bootstraps beans for external services including **Spring Mail**, **Mailtrap Java SDK**, OpenApi/Swagger documentation setups, caching layers, and CORS filters.
-  * Also when running for the first time or in an empty users table, the seeder seeds the database with initial users and other entities
-
-
-## General Approach
-Include a couple of paragraphs explaining:
-
-### Approach
-I started the project by implementing the user services such as registering and logging in and verifying email and so on.
-That gave me a foundation to cuntinue working with the already implemented JWT security to restrict administrative services to tokens that include librarian role.
-### Structure
-I structure the app revolving around the book table and the system functionalities, this left the structure to always be scalable (ex. I initially did not have authors and reviews tables in mind).
-
-
-## User Stories
-[Trello: user stories.](https://trello.com/invite/b/6ac5e7834bebef07fc444288/ATTIdecc791734b4cd6ac191843744f7f8216F35C90A/booknest)
-
-## ERD
-[ERD](https://github.com/Salah-Dawood/Library-System/blob/main/Library-System.png)
-
-### Deliverables
-Java Spring boot project
-
-Bonus: frontend utilizing Java backend (**AI GENERATED**)
-
-### Timeline
-7 Day Project
-* **Day 1:** planning architecture
-* **Day 2:** initializing project & creating authentication architecture
-* **Day 3:** implementing required models
-* **Day 4:** implementing endpoints and business logic
-* **Day 5:** implementing technical requirements (SSE,Seeding,Logging,Rate limting)
-* **Day 6:** implementing technical requirements (pagination,sorting,filteration,swagger)
-* **Day 7:** apply testing, write documentation
-
-### API Documentation
-#### Endpoints
-
-**Auth legend:** Public = no token needed · User = any logged-in user (JWT) · Librarian = librarian only
-
-##### Authentication & Email (`/auth`)
-
-| Method | Endpoint | Description | Access |
-|--------|----------|-------------|--------|
-| POST | `/auth/users/register` | Register a new member | Public |
-| POST | `/auth/users/login` | Log in and receive a JWT | Public |
-| PUT | `/auth/users/passwordreset/{token}` | Reset password using emailed token | Public |
-| PUT | `/auth/email/getverification/{username}` | Send email verification code | Public |
-| PUT | `/auth/email/verify/{username}?code=` | Verify email with code | Public |
-| PUT | `/auth/email/forgotpassword` | Send password-reset email | Public |
-
-##### Books (`/api/books`)
-
-| Method | Endpoint | Description | Access |
-|--------|----------|-------------|--------|
-| GET | `/api/books` | List books (paged). Params: `title`, `genre`, `page`, `size`, `sortBy`, `sortDir` | User |
-| GET | `/api/books/{bookId}` | Get one book with stock and rating | User |
-| GET | `/api/books/search/{title}` | Get a book by exact title | User |
-| POST | `/api/books` | Create a book | Librarian |
-| PUT | `/api/books/{bookId}` | Update a book | Librarian |
-| DELETE | `/api/books/{bookId}` | Delete a book | Librarian |
-
-##### Authors (`/api/authors`)
-
-| Method | Endpoint | Description | Access |
-|--------|----------|-------------|--------|
-| GET | `/api/authors` | List all authors | User |
-| GET | `/api/authors/{authorId}` | Get author by id | User |
-| GET | `/api/authors/search/{name}` | Get author by exact name | User |
-| POST | `/api/authors` | Create an author | Librarian |
-| PUT | `/api/authors/{authorId}` | Update an author | Librarian |
-| DELETE | `/api/authors/{authorId}` | Delete an author | Librarian |
-
-##### Genres (`/api/genres`)
-
-| Method | Endpoint | Description | Access |
-|--------|----------|-------------|--------|
-| GET | `/api/genres` | List all genres | User |
-| GET | `/api/genres/{name}` | Get genre by exact name | User |
-| POST | `/api/genres` | Create a genre | Librarian |
-| PUT | `/api/genres/{genreId}` | Update a genre | Librarian |
-| DELETE | `/api/genres/{genreId}` | Delete a genre | Librarian |
-
-##### Loans (`/api/loans`)
-
-| Method | Endpoint | Description | Access |
-|--------|----------|-------------|--------|
-| POST | `/api/loans` | Request a book loan (`bookId`, `duration` 1-30 days) | User |
-| GET | `/api/loans/my-loans` | List my loans | User |
-| GET | `/api/loans/my-stats` | My return statistics and reliability badge | User |
-| PUT | `/api/loans/{loanId}/cancel` | Cancel a loan (owner: requested only; librarian: also approved) | User |
-| PUT | `/api/loans/{loanId}/return` | Return a borrowed book (owner or librarian) | User |
-| GET | `/api/loans?status=` | List all loans, optional status filter | Librarian |
-| GET | `/api/loans/user/{userId}` | List a user's loans | Librarian |
-| GET | `/api/loans/user/{userId}/stats` | A user's return statistics | Librarian |
-| PUT | `/api/loans/{loanId}/approve` | Approve a loan request | Librarian |
-| PUT | `/api/loans/{loanId}/reject` | Reject a loan request (optional `reason`) | Librarian |
-
-##### Reviews (`/api`)
-
-| Method | Endpoint | Description | Access |
-|--------|----------|-------------|--------|
-| GET | `/api/books/{bookId}/reviews` | Get reviews and rating summary for a book | User |
-| POST | `/api/books/{bookId}/reviews` | Add a review (`rating`, `comment`) | User |
-| PUT | `/api/reviews/{reviewId}` | Update a review | User |
-| DELETE | `/api/reviews/{reviewId}` | Delete a review | User |
-
-##### Member Profile (`/api/member`)
-
-| Method | Endpoint | Description | Access |
-|--------|----------|-------------|--------|
-| GET | `/api/member/profile` | Get my profile | User |
-| PUT | `/api/member/update/profile` | Update my profile (multipart, optional image) | User |
-| PUT | `/api/member/change-password` | Change my password | User |
-
-##### Librarian Admin (`/api/librarian`, `/api/audit-log`)
-
-| Method | Endpoint | Description | Access |
-|--------|----------|-------------|--------|
-| GET | `/api/librarian/users` | List all users | Librarian |
-| GET | `/api/librarian/users/{userId}` | Get user details | Librarian |
-| PUT | `/api/librarian/users/deactivate/{userId}` | Deactivate a user | Librarian |
-| PUT | `/api/librarian/users/activate/{userId}` | Activate a user | Librarian |
-| GET | `/api/audit-log?type=&userId=` | View audit log (`USER`, `BOOK`, `LOAN`, `REVIEW`) | Librarian |
-
-##### Notifications
-
-| Method | Endpoint | Description | Access |
-|--------|----------|-------------|--------|
-| GET | `/api/notifications/stream` | Real-time notifications (Server-Sent Events) | User |
-
-#### Swagger
-http://localhost:9091/swagger-ui/index.html
-
-
-## Installation (how to run)
-Follow these steps to configure your IntelliJ environment and run the BookNest system locally.
-
-### Prerequisites
-Before running the application, ensure you have the following ready:
-* **Java Development Kit (JDK) 17 or higher** installed.
-* **IntelliJ IDEA** (Community or Ultimate edition).
-* **PostgreSQL** server running with an empty database created, with the name booknest-dev or booknest-demo
-* A **Mailtrap** account for email testing (if using dev profile)
-* A **Email account** with an app password (if using demo profile)
-
-### Configure IntelliJ Environment Variables
-configure the following environment variables that will be used by application.properties
-
-#### General
-* **DB_PASSWORD:** your PostgreSQL password
-* **JWT_SECRET:** This must be a secure, random string of at least 64 characters (512 bits)
-
-#### Demo Profile
-* **DEMO_DATABASE:** link to PostgreSQL Database
-* **EMAIL_USERNAME:** an email the app will use as source(ex. johndoe@gmail.com)
-* **EMAIL_PASSWORD:** email app password for the email (not normal password email) 16 characters long
-
-#### Dev Profile
-* **DEV_DATABASE:** link to PostgreSQL Database
-* **MAILTRAP_USERNAME:** mailtrap user name, can be seen in mailtrap dashboard. **without domain**
-* **MAILTRAP_PASSWORD:** mailtrap password, can be seen in mailtrap dashboard.
-
-
-## Unsolved Problems
-Some requirements implemented are not system system wide, rather only implemented once to show understanding of using the feature.
-## Major Challenges
-Had a small problem configuring a Many to Many relationship between two entities for the first time, but i found it nice that java/spring boot handles making the junction table.
-
-## Future Improvements
-**Spread the requirements** accross the system where it would be appropriate and efficient.
-**Implement email notification** for loan status updates
-
-## Credits & External Resources
-* **URL:** [Claude](https://claude.ai)
-* **Purpose:** Built a clean, simple frontend interface for the project demo.
-
-* **URL:** [Google AI Mode](https://ai.google)
-* **Purpose:** Provided end-to-end architectural guidance, explained complex Java structures, and mentored on industry best practices throughout development.
-
----
-
-# Project 3: Multithreading and Thread Safety Update
-
-Project 3 builds on the same app. Where the Project 2 sections above disagree with this update (the approval queue and the approve/reject endpoints), this update is the current behaviour.
-
-## Project 3 Changes
-
-**New functionality**
-* Borrowing is now instant. The librarian check moved to the end of the loan: the member returns the book, then a librarian reviews it for damage.
-* Waitlist: if a book has no copies, members can join its waitlist. When a copy comes back it is held for the first person in line for 24 hours.
-* Fines: late fines are created automatically on return, damage fines by the librarian. Members pay them.
-* Background jobs: emails are sent in the background, holds are expired every minute and a daily job reminds members about books due tomorrow.
-* Race demo (`race-demo` profile) and a new frontend with a Race lab page and an audit log page for librarians.
-
-**New models**
-* `WaitlistEntry`: book, user, status (`WAITING`, `HOLD_READY`, `FULFILLED`, `CANCELLED`, `EXPIRED`), hold expiry time and join time.
-* `Loan` has the new statuses `BORROWED`, `PENDING_REVIEW`, `RETURNED`, `CANCELLED` and review fields. `Fine` is linked to a loan and has a type and a status.
-
-**Concurrency-sensitive workflow:** borrow, return, review, cancel, claim a held copy, hold expiry and pay a fine. All of them change the number of copies of a book or the state of a loan, and can run at the same time as the same action from another user.
-
-**Race condition:** two members borrowing the last copy at the same moment (more in the table below).
-
-**Concurrency technique:** pessimistic locking (`@Lock(PESSIMISTIC_WRITE)`, which is `SELECT ... FOR UPDATE`) inside `@Transactional` methods.
-
-**Database consistency:** every operation is one transaction, and this rule must always hold for a book: `total copies = copies on the shelf + copies on loan + copies held for the waitlist`. Emails and notifications are sent only after the transaction commits.
-
-**Asynchronous processing**
-* `notificationExecutor`: thread pool for `@Async` emails, so a request does not wait for the mail server.
-* `holdExpiryExecutor`: fixed pool with `Callable` and `Future`, used by the job that expires holds.
-* `DueReminderJob`: `CompletableFuture.allOf` for the daily reminder emails.
-
-## Concurrency Explanation
-
-**Where it happens:** the server handles each request on its own thread, so two members can borrow the same book at the same time. The hold-expiry job also runs at the same time as members.
-
-**What goes wrong without control** (1 copy left):
-
-| Time | Member A | Member B |
-|------|----------|----------|
-| 1 | reads `availableCopies = 1` | |
-| 2 | | reads `availableCopies = 1` |
-| 3 | writes `0`, loan created | |
-| 4 | | still thinks it is 1, writes `0`, loan created |
-
-Two loans for one copy, and the stock is wrong.
-
-**How it is prevented:** the borrow locks the inventory row first. B waits until A commits, then sees `0` and gets `409 NO_COPIES_AVAILABLE`. One lock helper, `InventoryLocker`, is used everywhere stock changes. It also re-reads the row after locking, because Hibernate can hold an old copy in memory.
-
-**Why this approach:** the database does the locking, so it works with any number of threads or servers (a Java `synchronized` would not). Waiting is simpler than optimistic locking, where the losers would fail and need a retry. Locks are always taken member first, then book, so two requests cannot deadlock.
-
-**Race conditions handled**
-
-| Situation | Without control | Prevented by |
-|-----------|-----------------|--------------|
-| Many members borrow the last copy | More loans than copies | Lock on the inventory row |
-| One member borrows many books at once | More than 5 loans | Lock on the member row first |
-| Same fine paid twice | Paid twice | Lock on the fine, second gets `FINE_ALREADY_PAID` |
-| Two librarians review the same return | Copy put back twice | Lock on the loan |
-| Walk-in takes a copy held for the waitlist | First in line loses it | Held copies are not counted as available |
-| Hold expires while the member claims it | Copy lost or offered twice | Lock on the entry and the book, status checked again |
-
-## Testing
-
-Tests run with `mvn test` on an in-memory H2 database (`test` profile). For the concurrent tests, a helper (`ConcurrentRunner`) starts all threads together with a `CountDownLatch` so they hit the code at the same moment, then the test checks the results and the stock rule.
-
-```java
-List<Outcome> outcomes = ConcurrentRunner.runTogether(tasks);   // 10 members, 1 copy
-assertEquals(1, ConcurrentRunner.countSucceeded(outcomes));
-assertEquals(9, ConcurrentRunner.countErrorCode(outcomes, "NO_COPIES_AVAILABLE"));
-data.assertStockConsistent(book);
+* **Java 17, Spring Boot 4, Maven** (one multi-module project, one module per service), Lombok.
+* **Spring Cloud Gateway** (api-gateway).
+* **Spring Security + JWT** (JJWT): user-service signs the token, every service checks it with the shared secret.
+* **Bucket4j:** rate limit on login and the other `/auth` calls, per IP.
+* **Spring Data JPA / Hibernate, PostgreSQL** (Amazon RDS in production).
+* **Apache Kafka** (KRaft, one broker) with Spring Kafka: retries, dead-letter topics, duplicate checks.
+* **Spring Mail + Thymeleaf** templates, sent through Gmail SMTP.
+* **Server-Sent Events** for live notifications.
+* **ShedLock:** only one lending-service copy runs each scheduled job.
+* **Springdoc OpenAPI / Swagger UI** on user, catalog and lending service.
+* **Docker, Docker Compose, nginx** (frontend and lending load balancer).
+* **Jenkins** (CI/CD), **Docker Hub** (images).
+* **AWS:** EC2, RDS, IAM, Security Groups, CloudWatch Logs, EventBridge Scheduler.
+* **Cucumber** (BDD) with JUnit Platform, H2 and embedded Kafka for the tests.
+
+
+## Run it locally
+
+Needs only Docker Desktop (Java, Maven, PostgreSQL and Kafka all run inside containers).
+
+```bash
+cp .env.example .env
 ```
 
-* `ConcurrentBorrowTest`: last copy, loan limit, return against cancel.
-* `ConcurrentReturnAndFineTest`: same fine paid 5 times, two librarians reviewing one return.
-* `ConcurrentWaitlistTest`, `HoldExpiryJobTest`: held copies and hold expiry.
-* `ConcurrentRestTest`: real HTTP requests at the same time, one `201` and nine `409`.
-* `BookBorrowTest`, `WaitlistServiceTest`, `ClaimHoldTest`: normal rules with mocks.
+Fill in `.env` (database password, JWT secret, the Gmail address and app password for emails), then:
 
-## Updated API
+```bash
+docker compose up --build
+```
 
-| Method | Endpoint | Description | Access |
-|--------|----------|-------------|--------|
-| POST | `/api/loans` | Borrow a book (now instant) | User |
-| PUT | `/api/loans/{id}/return` | Return a book, waits for review | User |
-| GET | `/api/loans/returns-review` | Returns waiting for review | Librarian |
-| PUT | `/api/loans/{id}/review-return` | Review a return (`damaged`, `notes`, `fineAmount`) | Librarian |
-| PUT | `/api/loans/{id}/cancel` | Cancel a loan that is still out | Librarian |
-| POST | `/api/waitlist` | Join a waitlist | User |
-| GET | `/api/waitlist/my` | My waitlist entries | User |
-| GET | `/api/waitlist/{id}` | One entry with its position | User |
-| DELETE | `/api/waitlist/{id}` | Leave the waitlist | User |
-| POST | `/api/waitlist/{id}/claim?days=` | Claim the held copy | User |
-| GET | `/api/waitlist/book/{bookId}` | Queue of a book | Librarian |
-| GET | `/api/fines/my-fines` | My fines | User |
-| PUT | `/api/fines/{id}/pay` | Pay a fine | User |
-| GET | `/api/fines` | All fines | Librarian |
-| GET | `/api/fines/user/{id}` | A user's fines | Librarian |
-| POST | `/api/demo/race/{bookId}?threads=&safe=` | Last copy race demo | Librarian |
-| POST | `/api/demo/race/loan-limit/{username}?threads=&safe=` | Loan limit race demo | Librarian |
+Open http://localhost:8080. The first start seeds sample books, a librarian (`librarian`) and members.
+pgAdmin is on http://localhost:5050.
 
-The old approve and reject endpoints were removed. Conflicts return `409` with a code such as `NO_COPIES_AVAILABLE`, `LOAN_LIMIT_REACHED`, `NO_ACTIVE_HOLD`, `HOLD_EXPIRED`, `FINE_ALREADY_PAID` or `CONCURRENT_UPDATE`.
+To run a service from IntelliJ instead, start only what it needs with
+`docker compose up -d postgres kafka frontend`. More in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
-## Project 3 Challenges
 
-* The first lock still let a second borrow through, because Hibernate had already loaded an old copy of the stock. I fixed it by re-reading the row after locking (`InventoryLocker`). The race demo had a similar problem and needed `entityManager.clear()`.
-* Deciding what to lock, and in which order, so that requests cannot deadlock.
-* A held copy must not count as available, otherwise walk-ins take it.
-* Races do not fail every time, so the tests needed a latch to start threads together and repeated runs.
+## CI/CD and AWS in short
 
-## Project 3 Future Improvements
+```
+git push → Jenkins: Build → Test (Cucumber) → Build images → Push to Docker Hub → Deploy to EC2 → check the site
+```
 
-* Run the tests on PostgreSQL (for example with Testcontainers), because they use H2.
-* Retry automatically on `CONCURRENT_UPDATE` and add a lock timeout.
-* Make sure only one server instance runs the scheduled jobs.
+* Jenkins builds and tests every branch; on `main` it also builds the images, tags them with the version and
+  commit (for example `1.1.0-6ceaf21`), pushes them to Docker Hub and deploys them to the EC2 server.
+* EC2 runs the containers with `docker-compose.prod.yml`; the database is Amazon RDS, reachable only from the server.
+* Container logs go to CloudWatch Logs; EventBridge Scheduler starts and stops EC2 and RDS on a timetable.
 
-## Project 3 Credits & External Resources
+Details in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) and [docs/MONITORING.md](docs/MONITORING.md).
 
-These continue the credits from Project 2 above.
 
-* **Claude** - [https://claude.ai](https://claude.ai) - AI help to plan Project 3, explain locking and thread pools, and review the code, As well as writing the final frontend.
-* **Google AI** - General/Quick search about related topics.
+## Concurrency
 
-Thanks to instructor associates: Maryam and Zainab for technical help.
+Two members can borrow the last copy of a book at the same moment, and with two lending-service copies the
+two requests can even land on different servers. Without control both would read "1 copy left" and both get a loan.
+
+**How it is prevented:** every stock change locks the book's inventory row in the database
+(`@Lock(PESSIMISTIC_WRITE)`, `SELECT ... FOR UPDATE`) inside one transaction. The second request waits for the
+first to commit, then sees 0 copies and gets `409 NO_COPIES_AVAILABLE`. Because the database holds the lock,
+this works for any number of threads and any number of service instances (a Java `synchronized` would not).
+Locks are always taken member first, then book, so requests cannot deadlock.
+
+| Situation | Without control | Prevented by |
+|---|---|---|
+| Many members borrow the last copy | more loans than copies | lock on the inventory row |
+| One member borrows many books at once | more than 5 loans | lock on the member row first |
+| Same fine paid twice | paid twice | lock on the fine |
+| Two librarians review the same return | copy put back twice | lock on the loan |
+| A walk-in takes a copy held for the waitlist | first in line loses it | held copies are not counted as free |
+| A hold expires while the member claims it | copy lost or offered twice | lock on the entry and the book |
+| Both lending copies run the same scheduled job | reminders sent twice, holds expired twice | ShedLock (lock row in the `shedlock` table) |
+
+Rule that always holds for a book: `total copies = copies on the shelf + copies on loan + copies held for the waitlist`.
+Events (and so emails) are published only after the transaction commits.
+
+Shown by Cucumber scenarios (threads started together with a latch) and by `scripts/race-test.py`, which fires
+borrows at the deployed server through the load balancer. See [docs/TESTING.md](docs/TESTING.md).
+
+
+## User stories
+
+[Trello board](https://trello.com/invite/b/6ac5e7834bebef07fc444288/ATTIdecc791734b4cd6ac191843744f7f8216F35C90A/booknest)
+
+
+## Challenges
+
+* **Splitting the data.** Lending needed to lock a member row for the loan limit, but users moved to
+  user-service, so lending keeps its own small `members` table (id and username), created from the
+  JWT on a member's first lending request.
+* **Two lending instances.** The scheduled jobs ran twice, until ShedLock was added; the load balancer
+  had to find replaced containers again, so nginx re-resolves the service name every 10 seconds.
+* **Small servers.** The first EC2 instance (t3.micro, 1 GB) ran out of memory with Kafka and five JVMs;
+  it now runs on m7i-flex.large with a memory limit per container.
+* **Kafka tests.** Events arrive later than the HTTP answer, so the Cucumber steps wait for them with a
+  timeout instead of checking right away.
+
+
+## Future improvements
+
+* Separate databases (or schemas) per service instead of one shared database.
+* A domain name with HTTPS in front of the gateway.
+* Jenkins on a server instead of a laptop, triggered by GitHub webhooks.
+* Run the tests on PostgreSQL (Testcontainers) instead of H2.
+
+
+## Credits & external resources
+
+* **Claude** - [https://claude.ai](https://claude.ai) - planning, explanations, code review, the frontend,
+  and help with Docker, Jenkins and AWS.
+* **Google AI** - general searches about related topics.
+
+Thanks to my lead instructor [Saad](https://www.linkedin.com/in/saad-iqbal-6623a262/) and instructor associates
+[Maryam](https://www.linkedin.com/in/bymrmak/) and [Zainab](https://www.linkedin.com/in/zainab-al-zaimoor/) from General Assembly (GA)
+for their guidance and technical help.

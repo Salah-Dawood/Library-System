@@ -33,7 +33,7 @@ pipeline {
 
         stage('Test') {
             steps {
-                // lending-service tests (concurrency, waitlist, fines) and the user-service Cucumber scenarios
+                // the Cucumber scenarios of every service; one failing scenario stops the pipeline here
                 sh './mvnw -B test'
             }
             post {
